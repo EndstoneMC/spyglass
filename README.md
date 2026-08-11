@@ -81,8 +81,10 @@ Press **Insert** in game to open the overlay. It lists every diagnostic of the s
 with the full report and the raw body, and copies either the report or the JSON to the
 clipboard. The overlay pops itself open on a new violation; turn that off under `View`.
 
-Output also goes to disk, under `%LOCALAPPDATA%\spyglass` as resolved inside the
-AppContainer:
+Output also goes to disk, under `%LOCALAPPDATA%\spyglass`. That is the real user folder,
+`C:\Users\<you>\AppData\Local\spyglass`, not a per-package redirect: the client inherits
+the environment variable from whatever launched it, and the AppContainer is able to write
+there.
 
 | file | contents |
 | --- | --- |

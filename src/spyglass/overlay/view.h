@@ -19,6 +19,7 @@ private:
     void draw_history(const std::vector<DiagnosticHandle> &entries);
     void draw_detail(const std::vector<DiagnosticHandle> &entries);
     void draw_status(std::size_t retained);
+    void draw_fault_injection();
     const std::string &report_for(const Diagnostic &diagnostic);
 
     bool visible_{false};
@@ -27,6 +28,8 @@ private:
     std::uint64_t selected_{0};
     std::uint64_t cached_sequence_{0};
     std::string cached_report_;
+    int fault_packet_id_{58};
+    int fault_bytes_{4};
 };
 
 }  // namespace spyglass::overlay
