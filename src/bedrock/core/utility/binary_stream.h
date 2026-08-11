@@ -19,10 +19,6 @@ public:
     [[nodiscard]] std::string_view getView() const { return view_; }
     [[nodiscard]] bool hasOverflowed() const { return has_overflowed_; }
 
-    // SPYGLASS: not Bedrock methods. Fault injection narrows the readable window so the
-    // decoder runs off the end of a packet it would otherwise read cleanly.
-    void spyglassSetView(const std::string_view view) { view_ = view; }
-
 protected:
     std::string owned_buffer_;  // +8
     std::string_view view_;     // +40

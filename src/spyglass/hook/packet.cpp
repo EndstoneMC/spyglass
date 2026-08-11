@@ -1,9 +1,7 @@
 #include "spyglass/hook/packet.h"
 
-#include <algorithm>
 #include <atomic>
 #include <exception>
-#include <optional>
 #include <system_error>
 
 #include "bedrock/network/packet.h"
@@ -11,7 +9,6 @@
 #include "spyglass/core/log.h"
 #include "spyglass/diagnostics/builder.h"
 #include "spyglass/diagnostics/sink.h"
-#include "spyglass/hook/fault.h"
 #include "spyglass/hook/function_hook.h"
 
 namespace {
@@ -31,28 +28,6 @@ struct ReportingScope {
 };
 
 std::atomic_uint64_t observed{0};
-
-/**
- * Narrows the stream so the decode overruns, and hands back the original window for
- * the caller to put right afterwards. The packet body itself is left alone, so what
- * fails is a genuine read past the end rather than corrupted content.
- */
-std::optional<std::string_view> inject_fault(const Packet &packet, ReadOnlyBinaryStream &stream,
-                                             const std::size_t body_begin)
-{
-    const auto id = static_cast<int>(packet.getId());
-    if (!spyglass::faults().claim(id)) {
-        return std::nullopt;
-    }
-
-    const auto original = stream.getView();
-    const auto drop = static_cast<std::size_t>(spyglass::faults().bytes());
-    const auto kept = std::max(body_begin, original.size() > drop ? original.size() - drop : 0);
-    stream.spyglassSetView(original.substr(0, kept));
-    spyglass::log::info("fault injected into {} ({}): window cut from {} to {} bytes", packet.getName(), id,
-                        original.size(), kept);
-    return original;
-}
 
 void observe(const Packet &packet, const ReadOnlyBinaryStream &stream, const std::size_t body_begin,
              const Bedrock::Result<void> &result)
@@ -89,17 +64,9 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
                                            const SubClientId &sub_id)
 {
     const auto body_begin = stream.getReadPointer();
-    const auto restore = inject_fault(*this, stream, body_begin);
-
     auto result = SPYGLASS_CALL_ORIGINAL(spyglass::hook::Target::PacketReadNoHeader, &Packet::readNoHeader, this,
                                          stream, reflection_ctx, sub_id);
-
-    // Reported against the narrowed window, because that is what the decoder saw, then
-    // put back so the rest of the batch reads from the buffer the client handed us.
     observe(*this, stream, body_begin, result);
-    if (restore) {
-        stream.spyglassSetView(*restore);
-    }
     return result;
 }
 

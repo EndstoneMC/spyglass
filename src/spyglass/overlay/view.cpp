@@ -7,7 +7,6 @@
 
 #include "spyglass/core/config.h"
 #include "spyglass/diagnostics/format.h"
-#include "spyglass/hook/fault.h"
 #include "spyglass/hook/packet.h"
 
 namespace spyglass::overlay {
@@ -66,10 +65,6 @@ void View::draw()
                 diagnostics().clear();
                 selected_ = 0;
             }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Test")) {
-            draw_fault_injection();
             ImGui::EndMenu();
         }
         ImGui::TextColored(kMuted, "%zu retained / %llu seen", entries.size(),
@@ -157,31 +152,6 @@ void View::draw_detail(const std::vector<DiagnosticHandle> &entries)
     ImGui::EndChild();
 
     ImGui::EndChild();
-}
-
-void View::draw_fault_injection()
-{
-    ImGui::TextColored(kMuted, "Truncate the next packet of one id, so the decode\n"
-                               "overruns and the reporting path runs for real.");
-    ImGui::Separator();
-    ImGui::SetNextItemWidth(140);
-    ImGui::InputInt("packet id", &fault_packet_id_);
-    ImGui::SetNextItemWidth(140);
-    ImGui::InputInt("bytes to cut", &fault_bytes_);
-    fault_packet_id_ = std::clamp(fault_packet_id_, 0, 1023);
-    fault_bytes_ = std::clamp(fault_bytes_, 1, 4096);
-
-    auto &fault = faults();
-    if (fault.armed()) {
-        ImGui::TextColored(kTrailingBytes, "armed for id %d, waiting", fault.packet_id());
-        if (ImGui::SmallButton("Disarm")) {
-            fault.disarm();
-        }
-    }
-    else if (ImGui::SmallButton("Arm one shot")) {
-        fault.arm(fault_packet_id_, fault_bytes_);
-    }
-    ImGui::TextColored(kMuted, "The client will likely drop the connection\nafter the packet it cannot read.");
 }
 
 void View::draw_status(const std::size_t retained)
