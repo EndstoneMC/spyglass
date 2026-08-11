@@ -1,9 +1,13 @@
 """Cut a libhat byte pattern for a Bedrock client function, and prove it is unique.
 
     uv run --no-project --with capstone scripts/cut_signature.py \
-        --pe  <Minecraft.Windows.exe> \
-        --pdb <directory holding Minecraft.Windows.pdb> \
-        --symbol "Packet::readNoHeader"
+        --pe <Minecraft.Windows.exe> \
+        --anchor "0F B6 00 88 41 10 48 8B 01 48 8B 40 48"
+
+The anchor is a distinctive instruction run inside the wanted function; the PE's own
+exception directory then says where that function begins and ends. `--symbol` with
+`--pdb` does the same job when symbols happen to be available, and `--rva` when the
+address is already known.
 
 Wildcarding policy, so a pattern survives a relink of the same source:
 
@@ -22,6 +26,7 @@ how a pattern gets verified against a build whose symbols are unavailable.
 from __future__ import annotations
 
 import argparse
+import bisect
 import ctypes
 import struct
 import sys
@@ -128,6 +133,29 @@ class Image:
             sections.append((name, vaddr, vsize, rawptr, rawsize))
         return cls(data, base, sections)
 
+    def data_directory(self, index: int) -> tuple[int, int]:
+        pe_off = struct.unpack_from("<I", self.data, 0x3C)[0]
+        opt = pe_off + 24
+        magic = struct.unpack_from("<H", self.data, opt)[0]
+        directories = opt + (112 if magic == 0x20B else 96)
+        rva, size = struct.unpack_from("<II", self.data, directories + index * 8)
+        return rva, size
+
+    def functions(self) -> list[tuple[int, int]]:
+        """Every function's [begin, end) from .pdata. No symbols needed: x64 unwind
+        data covers every non-leaf function the linker emitted."""
+        rva, size = self.data_directory(3)  # IMAGE_DIRECTORY_ENTRY_EXCEPTION
+        if rva == 0 or size == 0:
+            raise SystemExit("no exception directory; cannot bound functions without symbols")
+        start = self.offset_of(rva)
+        out = []
+        for i in range(size // 12):
+            begin, end, _unwind = struct.unpack_from("<III", self.data, start + i * 12)
+            if begin and end > begin:
+                out.append((begin, end))
+        out.sort()
+        return out
+
     def section(self, name: str) -> tuple[int, int, int]:
         for entry in self.sections:
             if entry[0] == name:
@@ -191,6 +219,14 @@ def matches(image: Image, pattern: str, section: str = ".text") -> list[int]:
     return found
 
 
+def function_containing(functions: list[tuple[int, int]], rva: int) -> tuple[int, int] | None:
+    index = bisect.bisect_right(functions, (rva, 1 << 62)) - 1
+    if index < 0:
+        return None
+    begin, end = functions[index]
+    return (begin, end) if begin <= rva < end else None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--pe", type=Path, required=True)
@@ -198,6 +234,11 @@ def main() -> None:
     parser.add_argument("--symbol")
     parser.add_argument("--rva", type=lambda v: int(v, 16))
     parser.add_argument("--size", type=int, default=0)
+    parser.add_argument(
+        "--anchor",
+        help="byte pattern of a distinctive instruction run inside the wanted function. "
+        "The function is then bounded by .pdata, so no PDB is needed.",
+    )
     parser.add_argument("--budget", type=int, default=72, help="maximum pattern bytes")
     parser.add_argument("--verify", help="verify this pattern instead of cutting a new one")
     args = parser.parse_args()
@@ -209,13 +250,27 @@ def main() -> None:
         print(f"{len(hits)} match(es): {[hex(h) for h in hits]}")
         sys.exit(0 if len(hits) == 1 else 1)
 
-    if args.rva is not None:
+    if args.anchor:
+        hits = matches(image, args.anchor)
+        if not hits:
+            raise SystemExit("anchor not found in .text")
+        functions = image.functions()
+        owners = {function_containing(functions, h) for h in hits}
+        owners.discard(None)
+        print(f"anchor: {len(hits)} match(es) at {[hex(h) for h in hits]}")
+        for begin, end in sorted(owners):
+            print(f"  inside function 0x{begin:x}..0x{end:x} ({end - begin} bytes)")
+        if len(owners) != 1:
+            raise SystemExit("anchor must land inside exactly one function; tighten it")
+        rva, end = next(iter(owners))
+        size = end - rva
+    elif args.rva is not None:
         rva, size = args.rva, args.size or args.budget * 2
     elif args.symbol and args.pdb:
         rva, size = resolve_symbol(args.pdb, args.pe, args.symbol)
         print(f"{args.symbol}: rva=0x{rva:x} size={size}")
     else:
-        raise SystemExit("give either --rva or both --pdb and --symbol")
+        raise SystemExit("give --anchor, or --rva, or both --pdb and --symbol")
 
     pattern = cut(image, rva, size, args.budget)
     hits = matches(image, pattern)

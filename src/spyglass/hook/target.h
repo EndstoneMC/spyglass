@@ -18,10 +18,9 @@ struct TargetInfo {
 };
 
 /**
- * Patterns are cut from the symbolised gamecore_x64_desktop build with
- * scripts/cut_signature.py, which wildcards every rip-relative displacement,
- * rel32 branch target and frame offset so a relink does not invalidate them.
- * See docs/signatures.md before editing one by hand.
+ * Patterns come from scripts/cut_signature.py, which wildcards every rip-relative
+ * displacement, rel32 branch target and frame offset so a relink does not invalidate
+ * them. Regenerate with that script rather than editing one by hand.
  */
 inline constexpr std::array kTargets{
     TargetInfo{
