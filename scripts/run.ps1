@@ -24,10 +24,8 @@ if (-not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrat
 
 if ($Preview) {
     $appId = 'Microsoft.MinecraftWindowsBeta_8wekyb3d8bbwe!Game'
-    $package = 'Microsoft.MinecraftWindowsBeta_8wekyb3d8bbwe'
 } else {
     $appId = 'Microsoft.MinecraftUWP_8wekyb3d8bbwe!Game'
-    $package = 'MICROSOFT.MINECRAFTUWP_8wekyb3d8bbwe'
 }
 
 $injector = Join-Path $BuildDir 'spyglass-inject.exe'
@@ -47,8 +45,9 @@ if (-not (Get-Process -Name 'Minecraft.Windows' -ErrorAction SilentlyContinue)) 
     Start-Sleep -Seconds 12
 }
 
-$log = Join-Path $env:LOCALAPPDATA "Packages\$package\LocalCache\Local\spyglass\spyglass.log"
-$before = if (Test-Path $log) { (Get-Item $log).Length } else { 0 }
+# The client inherits LOCALAPPDATA from its launcher rather than the package redirect,
+# so the payload writes to the real user folder, not Packages\<pfn>\LocalCache.
+$log = Join-Path $env:LOCALAPPDATA 'spyglass\spyglass.log'
 
 & $injector
 if ($LASTEXITCODE -ne 0) {
