@@ -47,12 +47,14 @@ two sides disagree about a field.
 
 ## Quick Start
 
-Start Minecraft, then run the injector from an **elevated** prompt — Minecraft is a packaged app, and opening a
-handle to one needs it.
+Start Minecraft, then run the injector:
 
 ```shell
 spyglass.exe
 ```
+
+It asks for administrator rights on its way in — Minecraft is a packaged app, and opening a handle to one needs
+them — and the elevated run carries on in a window of its own.
 
 Press **Insert** in game for the overlay. It lists every diagnostic of the session with the full report and the raw
 packet body, and copies either the report or the JSON to your clipboard. It opens itself when a new one arrives;

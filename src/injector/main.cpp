@@ -10,6 +10,7 @@
 
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <ShellAPI.h>
 #include <TlHelp32.h>
 
 namespace {
@@ -41,6 +42,90 @@ void report(const std::wstring_view what, const DWORD error = GetLastError())
     std::fwprintf(stderr, L"error: %.*s failed (%lu): %s", static_cast<int>(what.size()), what.data(), error,
                   text != nullptr ? text : L"\n");
 }
+
+bool elevated()
+{
+    HANDLE raw = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &raw) == 0) {
+        return false;
+    }
+    const UniqueHandle token{raw};
+    TOKEN_ELEVATION elevation{};
+    DWORD size = 0;
+    return GetTokenInformation(token.get(), TokenElevation, &elevation, sizeof(elevation), &size) != 0 &&
+           elevation.TokenIsElevated != 0;
+}
+
+std::wstring_view arguments_of(const std::wstring_view command_line)
+{
+    std::size_t cursor = 0;
+    if (!command_line.empty() && command_line.front() == L'"') {
+        cursor = command_line.find(L'"', 1);
+        cursor = cursor == std::wstring_view::npos ? command_line.size() : cursor + 1;
+    }
+    else {
+        cursor = command_line.find_first_of(L" \t");
+        cursor = cursor == std::wstring_view::npos ? command_line.size() : cursor;
+    }
+
+    const auto rest = command_line.substr(cursor);
+    const auto start = rest.find_first_not_of(L" \t");
+    return start == std::wstring_view::npos ? std::wstring_view{} : rest.substr(start);
+}
+
+/**
+ * Runs this command again through the "runas" verb, which is what raises the UAC
+ * prompt. The arguments are handed over as they were typed rather than rebuilt from
+ * argv, so nothing has to be re-quoted.
+ */
+int relaunch_elevated()
+{
+    std::wstring self(MAX_PATH, L'\0');
+    self.resize(GetModuleFileNameW(nullptr, self.data(), static_cast<DWORD>(self.size())));
+    const auto directory = std::filesystem::current_path().wstring();
+    const std::wstring arguments{arguments_of(GetCommandLineW())};
+
+    SHELLEXECUTEINFOW request{
+        .cbSize = sizeof(SHELLEXECUTEINFOW),
+        .fMask = SEE_MASK_NOCLOSEPROCESS,
+        .lpVerb = L"runas",
+        .lpFile = self.c_str(),
+        .lpParameters = arguments.empty() ? nullptr : arguments.c_str(),
+        .lpDirectory = directory.c_str(),
+        .nShow = SW_SHOWNORMAL,
+    };
+    if (ShellExecuteExW(&request) == 0) {
+        const auto error = GetLastError();
+        if (error == ERROR_CANCELLED) {
+            std::fwprintf(stderr, L"error: the elevation prompt was declined\n");
+            return 1;
+        }
+        report(L"ShellExecuteExW", error);
+        return 1;
+    }
+
+    const UniqueHandle child{request.hProcess};
+    WaitForSingleObject(child.get(), INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(child.get(), &code);
+    return static_cast<int>(code);
+}
+
+/**
+ * An elevated run gets a console of its own, and that console dies with the process.
+ * Hold it open so whatever was printed can be read; a shared console is left alone.
+ */
+struct ConsoleHold {
+    ~ConsoleHold()
+    {
+        DWORD owners[2]{};
+        if (GetConsoleProcessList(owners, 2) != 1) {
+            return;
+        }
+        std::fwprintf(stderr, L"\npress ENTER to close\n");
+        std::getwchar();
+    }
+};
 
 std::optional<DWORD> find_process(const std::wstring &name)
 {
@@ -211,6 +296,13 @@ int wmain(const int argc, wchar_t **argv)
             return usage();
         }
     }
+
+    if (!elevated()) {
+        std::wprintf(L"asking for administrator rights, the run continues in a new window\n");
+        return relaunch_elevated();
+    }
+
+    const ConsoleHold hold;
 
     if (payload.empty()) {
         payload = beside_this_executable(kDefaultModule);
