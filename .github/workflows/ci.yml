@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions: read-all
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86_64
+
+      - name: Set up CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Restore Conan cache
+        id: conan-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt', '.conan2/profiles/*') }}
+          restore-keys: |
+            ${{ runner.os }}-conan-
+
+      - name: Install dependencies with Conan
+        run: conan install . --build=missing
+
+      - name: Build with CMake
+        run: |
+          cmake --preset conan-relwithdebinfo
+          cmake --build --preset conan-relwithdebinfo
+
+      - name: Save Conan cache
+        if: github.event_name != 'pull_request' && steps.conan-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt', '.conan2/profiles/*') }}
+
+      - name: Stage artifact
+        run: cmake --install build/RelWithDebInfo --prefix dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: spyglass
+          path: dist/*
+          if-no-files-found: error
