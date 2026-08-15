@@ -42,8 +42,8 @@ target_link_libraries(spyglass PRIVATE
         imgui_backends)
 
 add_executable(spyglass_inject src/injector/main.cpp)
-target_link_libraries(spyglass_inject PRIVATE advapi32)
-# spyglass.exe sits beside spyglass.dll, so the debug symbols need a name of their own.
-set_target_properties(spyglass_inject PROPERTIES OUTPUT_NAME spyglass PDB_NAME spyglass-inject)
+target_link_libraries(spyglass_inject PRIVATE advapi32 shell32)
+target_link_options(spyglass_inject PRIVATE /DEBUG:NONE)
+set_target_properties(spyglass_inject PROPERTIES OUTPUT_NAME spyglass)
 
 install(TARGETS spyglass spyglass_inject RUNTIME DESTINATION .)
