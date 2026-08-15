@@ -18,9 +18,8 @@ struct TargetInfo {
 };
 
 /**
- * Patterns come from scripts/cut_signature.py, which wildcards every rip-relative
- * displacement, rel32 branch target and frame offset so a relink does not invalidate
- * them. Regenerate with that script rather than editing one by hand.
+ * Patterns wildcard every rip-relative displacement, rel32 branch target and frame
+ * offset, so a relink of the same source does not invalidate them.
  */
 inline constexpr std::array kTargets{
     TargetInfo{

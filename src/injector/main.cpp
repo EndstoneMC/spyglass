@@ -188,7 +188,7 @@ std::filesystem::path beside_this_executable(const std::wstring_view name)
 
 int usage()
 {
-    std::fwprintf(stderr, L"usage: spyglass-inject [--dll <path>] [--process <name>]\n");
+    std::fwprintf(stderr, L"usage: spyglass [--dll <path>] [--process <name>]\n");
     return 2;
 }
 

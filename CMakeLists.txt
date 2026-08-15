@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.23)
 project(spyglass VERSION 0.1.0 LANGUAGES CXX)
 
-if (NOT WIN32)
-    message(FATAL_ERROR "spyglass targets Windows only")
+if (NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "spyglass targets 64-bit Windows only")
 endif ()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -40,11 +40,10 @@ target_link_libraries(spyglass PRIVATE
         funchook::funchook
         libhat::libhat
         imgui_backends)
-set_target_properties(spyglass PROPERTIES OUTPUT_NAME spyglass PREFIX "")
 
 add_executable(spyglass_inject src/injector/main.cpp)
-target_include_directories(spyglass_inject PRIVATE src)
 target_link_libraries(spyglass_inject PRIVATE advapi32)
-set_target_properties(spyglass_inject PROPERTIES OUTPUT_NAME spyglass-inject)
+# spyglass.exe sits beside spyglass.dll, so the debug symbols need a name of their own.
+set_target_properties(spyglass_inject PROPERTIES OUTPUT_NAME spyglass PDB_NAME spyglass-inject)
 
 install(TARGETS spyglass spyglass_inject RUNTIME DESTINATION .)

@@ -1,0 +1,12 @@
+[requires]
+expected-lite/0.9.0
+funchook/1.1.3
+imgui/1.92.8-docking
+libhat/0.11.1
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

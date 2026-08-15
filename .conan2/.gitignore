@@ -1,0 +1,7 @@
+extensions/plugins/*
+migrations/*
+p/*
+*.db
+global.conf
+settings.yml
+version.txt
