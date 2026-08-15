@@ -1,16 +1,26 @@
-# Spyglass
+<div align="center">
+  <img src="https://minecraft.wiki/images/Spyglass_JE2_BE1.png" alt="Logo" width="80" height="80">
 
-Spyglass tells you when the Minecraft Bedrock Windows client fails to read a packet the
-server sent, and shows you exactly where it gave up.
+<h3>Spyglass</h3>
 
-If you write server software, a proxy, or a protocol translation layer, the client's
-side of a protocol bug is normally invisible: the connection drops, or the world quietly
-comes out wrong, and nothing tells you which packet was at fault. Spyglass sits inside the
-client and reports the failure the moment it happens — which packet, how far into it the
-decode got, and the reason the client rejected it.
+<p>
+  <b>Packet decode diagnostics for the Minecraft Bedrock client</b><br>
+  Which packet the client failed to read, and exactly where it gave up
+</p>
 
-It is a Windows counterpart to [dobby](https://github.com/evc24004/dobby), which does the
-same job for the Android client under mcpelauncher.
+[![CI](https://github.com/EndstoneMC/spyglass/actions/workflows/ci.yml/badge.svg)](https://github.com/EndstoneMC/spyglass/actions/workflows/ci.yml)
+[![Minecraft](https://img.shields.io/badge/minecraft-Bedrock_(Windows)-black)](https://www.minecraft.net/en-us/download)
+[![Discord](https://img.shields.io/discord/1230982180742631457?logo=discord&logoColor=white&color=5865F2)](https://discord.gg/xxgPuc2XN9)
+
+</div>
+
+## Why Spyglass?
+
+If you write server software, a proxy, or a protocol translation layer, the client's side of a protocol bug is
+normally invisible: the connection drops, or the world quietly comes out wrong, and nothing tells you which packet
+was at fault. Spyglass sits inside the client and reports the failure the moment it happens — which packet, how far
+into it the decode got, and the reason the client rejected it. It is the Windows counterpart to
+[dobby](https://github.com/evc24004/dobby), which does the same job for the Android client under mcpelauncher.
 
 ## What a report looks like
 
@@ -32,49 +42,38 @@ Raw body ('>' marks the cursor):
 > 000493  1f 8b 08 00 00 00 00 00 00 03 ed 5d 6b 73 db 38
 ```
 
-Packets that decode successfully but leave bytes behind are reported too, as
-`trailing_bytes` — usually a sign the two sides disagree about a field.
+Packets that decode successfully but leave bytes behind are reported too, as `trailing_bytes` — usually a sign the
+two sides disagree about a field.
 
-## Building
+## Quick Start
 
-Needs clang-cl (LLVM 18+), the MSVC toolchain, CMake 3.23+, Ninja and Conan 2.
-Dependencies come from Endstone's Cloudsmith remote:
+Start Minecraft, then run the injector from an **elevated** prompt — Minecraft is a packaged app, and opening a
+handle to one needs it.
 
 ```shell
-conan remote add endstone https://conan.cloudsmith.io/endstone/conan/
-conan install . -of build/conan_out -pr:a profiles/default --build=missing
+spyglass.exe
+```
+
+Press **Insert** in game for the overlay. It lists every diagnostic of the session with the full report and the raw
+packet body, and copies either the report or the JSON to your clipboard. It opens itself when a new one arrives;
+turn that off under `View`.
+
+| option | |
+| --- | --- |
+| `--dll <path>` | a payload somewhere other than beside the executable |
+| `--process <name>` | a client process other than `Minecraft.Windows.exe` |
+
+## Building from Source
+
+Needs clang-cl (LLVM 18+), the MSVC toolchain, CMake 3.23+, Ninja and Conan 2.
+
+```shell
+conan install . --build=missing
 cmake --preset conan-relwithdebinfo
 cmake --build --preset conan-relwithdebinfo
 ```
 
-You get `spyglass.dll` and `spyglass-inject.exe` in
-`build/conan_out/build/RelWithDebInfo/`.
-
-## Using it
-
-Start Minecraft, then from an **elevated** prompt:
-
-```shell
-spyglass-inject.exe
-```
-
-Elevation is required — Minecraft is a packaged app, and opening a handle to one needs it.
-
-`scripts/run.ps1` does the whole thing for you: starts the client, injects, and follows
-the log. Add `-Preview` to target Minecraft Preview.
-
-```shell
-powershell -ExecutionPolicy Bypass -File scripts\run.ps1
-```
-
-Press **Insert** in game for the overlay. It lists every diagnostic of the session with the
-full report and the raw packet body, and copies either the report or the JSON to your
-clipboard. It opens itself when a new one arrives; turn that off under `View`.
-
-Options:
-
-- `--dll <path>` — a payload somewhere other than beside the injector
-- `--process <name>` — a client process other than `Minecraft.Windows.exe`
+`spyglass.exe` and `spyglass.dll` land in `build/RelWithDebInfo`.
 
 ## Output
 
@@ -97,20 +96,17 @@ Set these before launching the client to change the defaults:
 | `SPYGLASS_TRAILING_BYTES` | `1` | set `0` to report decode failures only |
 | `SPYGLASS_WRITE_EVENTS` | `1` | set `0` for overlay only, nothing written |
 
-## Client versions
+## Client Versions
 
-Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied
-to a single release. It will not guess, though: if a pattern no longer matches exactly one
-place, it refuses to install that hook and says so in the log rather than risk patching the
-wrong function. A client update can therefore need the patterns refreshed, which
-`scripts/cut_signature.py` does.
-
-The overlay reports how many packets it has seen. If that stays at zero while you are
-connected, the hook is not installed and the log will say why.
+Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied to a single release. It
+will not guess, though: if a pattern no longer matches exactly one place, it refuses to install that hook and says
+so in the log rather than risk patching the wrong function. A client update can therefore need the patterns
+refreshed. The overlay reports how many packets it has seen; if that stays at zero while you are connected, the hook
+is not installed and the log will say why.
 
 ## Caveats
 
 - Reports are only as good as the reasons the client gives, which vary by packet.
 - The overlay draws over Direct3D 11 and 12. Other rendering paths are not supported.
-- Diagnostics contain packet contents from whatever server you are connected to. The log
-  and JSONL are not sanitised, so be careful sharing them.
+- Diagnostics contain packet contents from whatever server you are connected to. The log and JSONL are not
+  sanitised, so be careful sharing them.
