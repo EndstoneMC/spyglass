@@ -29,6 +29,16 @@ using PresentFn = HRESULT(IDXGISwapChain *, UINT, UINT);
 using ResizeBuffersFn = HRESULT(IDXGISwapChain *, UINT, UINT, UINT, DXGI_FORMAT, UINT);
 using ExecuteCommandListsFn = void(ID3D12CommandQueue *, UINT, ID3D12CommandList *const *);
 
+bool os_cursor_visible()
+{
+    CURSORINFO cursor{.cbSize = sizeof(CURSORINFO)};
+    if (GetCursorInfo(&cursor) == 0) {
+        return false;
+    }
+    // A hidden cursor is either one ShowCursor took away or one left without an image.
+    return (cursor.flags & CURSOR_SHOWING) != 0 && cursor.hCursor != nullptr;
+}
+
 std::atomic<PresentFn *> g_present{nullptr};
 std::atomic<ResizeBuffersFn *> g_resize_buffers{nullptr};
 std::atomic<ExecuteCommandListsFn *> g_execute_command_lists{nullptr};
@@ -185,8 +195,6 @@ void Overlay::create_context()
 
     auto &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    // The game hides the OS cursor and keeps it captured, so ImGui draws its own.
-    io.MouseDrawCursor = true;
     settings_path_ = (config().output_directory / "overlay.ini").string();
     io.IniFilename = settings_path_.c_str();
     context_ready_ = true;
@@ -236,6 +244,10 @@ void Overlay::present(IDXGISwapChain *swap_chain)
     if (!ensure_ready(swap_chain)) {
         return;
     }
+
+    // Gameplay hides the OS cursor, so ImGui has to draw one; the game's UI screens
+    // show it again, and drawing ours on top of that is what puts two on screen.
+    ImGui::GetIO().MouseDrawCursor = !os_cursor_visible();
 
     backend_->new_frame();
     ImGui_ImplWin32_NewFrame();
