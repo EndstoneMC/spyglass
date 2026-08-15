@@ -32,6 +32,7 @@ public:
 private:
     bool ensure_ready(IDXGISwapChain *swap_chain);
     void create_context();
+    void follow_window_dpi();
 
     hook::FunctionHook present_hook_;
     hook::FunctionHook resize_hook_;
@@ -42,6 +43,8 @@ private:
     View view_;
 
     ID3D12CommandQueue *command_queue_{nullptr};
+    HWND window_{nullptr};
+    float dpi_scale_{0.0F};
     std::string settings_path_;
     bool context_ready_{false};
     bool unsupported_{false};

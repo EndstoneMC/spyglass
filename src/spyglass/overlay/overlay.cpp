@@ -200,6 +200,25 @@ void Overlay::create_context()
     context_ready_ = true;
 }
 
+/**
+ * Sizes and fonts are rebuilt from the defaults on every change: ScaleAllSizes
+ * multiplies what it is given, so applying it to an already scaled style compounds.
+ */
+void Overlay::follow_window_dpi()
+{
+    const auto scale = ImGui_ImplWin32_GetDpiScaleForHwnd(window_);
+    if (scale == dpi_scale_) {
+        return;
+    }
+
+    ImGuiStyle style;
+    ImGui::StyleColorsDark(&style);
+    style.ScaleAllSizes(scale);
+    style.FontScaleDpi = scale;
+    ImGui::GetStyle() = style;
+    dpi_scale_ = scale;
+}
+
 bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
 {
     if (backend_) {
@@ -214,6 +233,7 @@ bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
         return false;
     }
 
+    window_ = desc.OutputWindow;
     if (!context_ready_) {
         create_context();
     }
@@ -244,6 +264,8 @@ void Overlay::present(IDXGISwapChain *swap_chain)
     if (!ensure_ready(swap_chain)) {
         return;
     }
+
+    follow_window_dpi();
 
     // Gameplay hides the OS cursor, so ImGui has to draw one; the game's UI screens
     // show it again, and drawing ours on top of that is what puts two on screen.
