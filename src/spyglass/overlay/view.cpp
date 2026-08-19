@@ -153,7 +153,7 @@ void View::draw_recent()
         ImGui::TextColored(kMuted, "%zu shown, newest first", recent.size());
     }
     if (const auto path = recording_path(); !path.empty()) {
-        ImGui::TextColored(kMuted, "writing every packet to %s", path.c_str());
+        ImGui::TextColored(kMuted, "writing every packet, bodies and all, to %s", path.c_str());
     }
     ImGui::Separator();
 

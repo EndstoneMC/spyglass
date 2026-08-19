@@ -103,9 +103,24 @@ all, so it can never raise a diagnostic, and its absence from the list is the on
 looking at is usually gone by the time you reach for it. Nothing is lost while paused, the window keeps filling
 underneath.
 
-`Record` appends every packet to `traffic.log` in the output directory for as long as it is on, so a whole
-session survives even though the window on screen only holds the last thousand. Turn on `Keep bodies` as well and
-each line carries the body too, which is complete but grows quickly.
+`Record` writes every packet to `traffic.bin` in the output directory for as long as it is on, bodies and all, so
+a whole session survives even though the window on screen only holds the last thousand. It is the bytes rather
+than a description of them, because `spyglass.log` and `events.jsonl` already describe. The file is a header and
+then one record per packet, little endian throughout:
+
+| | |
+| --- | --- |
+| `char[4]`, `uint32` | `SPYG` and a format version, once at the start of the file |
+| `uint64` | sequence number |
+| `uint64` | milliseconds since the hook went in |
+| `uint32` | thread that decoded it |
+| `uint16` | packet id |
+| `uint8` | 0 received, 1 sent |
+| `uint8` | 1 when the decode failed |
+| `uint32` | body length, followed by that many bytes |
+
+Sent packets carry no body: the hook runs before the client has written one. Recording is independent of
+`Keep bodies`, which only governs what the overlay holds on to for looking at.
 
 Turn on `Keep bodies` and pick a packet to see its body as one unbroken hex run. `Save hex` writes it out in the
 form a decoder's hex loader wants, for replaying the packet offline.
@@ -150,6 +165,7 @@ Everything also goes to `%LOCALAPPDATA%\spyglass`, or to `$XDG_DATA_HOME/spyglas
 | `spyglass.log` | one line per diagnostic, plus startup and status |
 | `events.jsonl` | one JSON object per diagnostic, including the raw bytes as hex |
 | `overlay.ini` | overlay window layout, Windows only. On Linux the launcher stores it with its own |
+| `traffic.bin` | every packet of the session, bodies included, while `Record` is on |
 
 ## Client Versions
 

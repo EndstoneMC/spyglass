@@ -58,9 +58,9 @@ bool body_capture();
 std::vector<std::uint8_t> packet_body(std::uint64_t sequence);
 
 /**
- * Whether to append every packet to `traffic.log` as it arrives. The window on screen only holds
- * the last thousand, so this is how a session is kept whole. With body capture on as well, each
- * line carries the body too, which is complete but grows quickly.
+ * Whether to write every packet to `traffic.bin` as it arrives, bodies and all. The window on
+ * screen only holds the last thousand, so this is how a whole session is kept. It is the bytes
+ * rather than a description of them, since spyglass.log and events.jsonl already describe.
  */
 void set_recording(bool enabled);
 bool recording();

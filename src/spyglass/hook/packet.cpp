@@ -5,10 +5,9 @@
 #include <atomic>
 #include <chrono>
 #include <exception>
-#include <format>
 #include <fstream>
-#include <iterator>
 #include <mutex>
+#include <ostream>
 #include <string_view>
 #include <system_error>
 
@@ -24,7 +23,6 @@
 #include "bedrock/platform/result.h"
 #include "spyglass/core/log.h"
 #include "spyglass/core/output.h"
-#include "spyglass/core/time.h"
 #include "spyglass/diagnostics/builder.h"
 #include "spyglass/diagnostics/sink.h"
 #include "spyglass/hook/function_hook.h"
@@ -135,7 +133,7 @@ std::mutex g_recent_mutex;
 std::array<RecentEntry, kRecentLimit> g_recent{};
 std::size_t g_recent_written = 0;
 
-void append(const RecentEntry &entry, std::string_view name, const std::uint8_t *body, std::size_t body_size);
+void append(const RecentEntry &entry, const std::uint8_t *body, std::size_t body_size);
 
 void record(const Packet &packet, const ReadOnlyBinaryStream &stream, const std::size_t body_begin, const bool failed)
 {
@@ -155,45 +153,47 @@ void record(const Packet &packet, const ReadOnlyBinaryStream &stream, const std:
     const auto *body = view.data() != nullptr && view.size() > body_begin
                            ? reinterpret_cast<const std::uint8_t *>(view.data()) + body_begin
                            : nullptr;
-    const auto keeping = g_capture_bodies.load(std::memory_order_relaxed);
-    if (keeping) {
+    if (g_capture_bodies.load(std::memory_order_relaxed)) {
         capture(entry.sequence, stream, body_begin);
     }
-    append(entry, packet.getName(), keeping ? body : nullptr, keeping ? entry.body_size : 0);
+    append(entry, body, entry.body_size);
 
     const std::lock_guard lock{g_recent_mutex};
     g_recent[g_recent_written % kRecentLimit] = entry;
     ++g_recent_written;
 }
 
-void append(const RecentEntry &entry, const std::string_view name, const std::uint8_t *body,
-            const std::size_t body_size)
+/**
+ * A capture is the bytes, not a retelling of them: spyglass.log and events.jsonl already say what
+ * happened in words. Each packet gets a small fixed header so the stream can be walked, then its
+ * body verbatim. Everything is little endian, the order it was read in.
+ */
+template <typename T>
+void put(std::ostream &out, const T value)
+{
+    out.write(reinterpret_cast<const char *>(&value), sizeof(value));
+}
+
+void append(const RecentEntry &entry, const std::uint8_t *body, const std::size_t body_size)
 {
     if (!g_recording.load(std::memory_order_relaxed)) {
         return;
     }
 
-    auto line = std::format("{:>8}.{:03} t{:<6} {:<3} {} ({})", entry.at / 1000, entry.at % 1000, entry.thread,
-                            entry.outbound ? "out" : "in", name, entry.id);
-    if (!entry.outbound) {
-        line += std::format(" {} bytes", entry.body_size);
-    }
-    if (entry.unread != 0) {
-        line += std::format(" {} unread", entry.unread);
-    }
-    if (entry.failed) {
-        line += " DECODE FAILED";
-    }
-    if (body != nullptr && body_size != 0) {
-        line += " ";
-        for (std::size_t i = 0; i < body_size; ++i) {
-            std::format_to(std::back_inserter(line), "{:02x}", body[i]);
-        }
+    const std::lock_guard lock{g_file_mutex};
+    if (!g_file) {
+        return;
     }
 
-    const std::lock_guard lock{g_file_mutex};
-    if (g_file) {
-        g_file << line << '\n';
+    put<std::uint64_t>(g_file, entry.sequence);
+    put<std::uint64_t>(g_file, entry.at);
+    put<std::uint32_t>(g_file, entry.thread);
+    put<std::uint16_t>(g_file, static_cast<std::uint16_t>(entry.id));
+    put<std::uint8_t>(g_file, entry.outbound ? 1 : 0);
+    put<std::uint8_t>(g_file, entry.failed ? 1 : 0);
+    put<std::uint32_t>(g_file, static_cast<std::uint32_t>(body_size));
+    if (body != nullptr && body_size != 0) {
+        g_file.write(reinterpret_cast<const char *>(body), static_cast<std::streamsize>(body_size));
     }
 }
 
@@ -269,7 +269,7 @@ void note_outbound(const Packet &packet)
         .outbound = true,
     };
 
-    append(entry, packet.getName(), nullptr, 0);
+    append(entry, nullptr, 0);
 
     const std::lock_guard lock{g_recent_mutex};
     g_recent[g_recent_written % kRecentLimit] = entry;
@@ -289,12 +289,15 @@ void set_recording(const bool enabled)
     }
 
     if (enabled) {
-        g_file_path = (output_directory() / "traffic.log").string();
+        g_file_path = (output_directory() / "traffic.bin").string();
         // Appending keeps whatever earlier runs wrote, since a session that ended badly is
         // usually the one worth reading.
-        g_file.open(g_file_path, std::ios::app);
+        g_file.open(g_file_path, std::ios::app | std::ios::binary);
         if (g_file) {
-            g_file << std::format("--- recording from {} ---\n", timestamp());
+            if (g_file.tellp() == 0) {
+                g_file.write("SPYG", 4);
+                put<std::uint32_t>(g_file, 1);
+            }
         }
         else {
             log::error("cannot write {}", g_file_path);
