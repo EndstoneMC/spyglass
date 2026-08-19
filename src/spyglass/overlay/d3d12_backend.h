@@ -12,12 +12,7 @@
 
 namespace spyglass::overlay {
 
-/**
- * Renders on the game's own direct command queue, which is captured by hooking
- * ExecuteCommandLists. One command allocator per back buffer: an allocator is only
- * reset when its buffer comes round again, which the swap chain will not do until
- * the GPU has finished with it.
- */
+// One command allocator per back buffer, reset only when its buffer comes round again.
 class D3D12Backend final : public RenderBackend {
 public:
     /** Returns null unless the swap chain is D3D12 and a direct queue was captured. */

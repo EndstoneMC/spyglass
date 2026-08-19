@@ -12,7 +12,6 @@ enum class Failure : std::uint8_t {
     TrailingBytes,
 };
 
-/** One frame of the Bedrock call stack carried by a failed `Bedrock::Result`. */
 struct Frame {
     std::string filename;
     std::uint32_t line{};
@@ -20,7 +19,6 @@ struct Frame {
     std::size_t depth{};
 };
 
-/** Where the read stopped, relative to the packet body it was reading. */
 struct StreamState {
     std::size_t body_begin{};
     std::size_t cursor{};

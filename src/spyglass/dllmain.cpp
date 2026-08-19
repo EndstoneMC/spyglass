@@ -2,8 +2,8 @@
 
 #include <Windows.h>
 
-#include "spyglass/core/config.h"
 #include "spyglass/core/log.h"
+#include "spyglass/core/output.h"
 #include "spyglass/hook/packet.h"
 #include "spyglass/overlay/overlay.h"
 
@@ -25,10 +25,9 @@ void attempt(const char *what, Step &&step)
 
 DWORD WINAPI initialise(LPVOID /*parameter*/)
 {
-    spyglass::log::info("spyglass attached, writing to {}", spyglass::config().output_directory.string());
-    // Independent: a client whose graphics path we cannot reach still gets diagnostics
-    // on disk, and a stale packet pattern still leaves the overlay usable.
-    attempt("packet hooks", spyglass::install_packet_hooks);
+    spyglass::log::info("spyglass attached, writing to {}", spyglass::output_directory().string());
+    // Independent: either one is still worth having when the other cannot be installed.
+    attempt("packet hook", spyglass::install_packet_hook);
     attempt("overlay", [] { spyglass::overlay::Overlay::instance().install(); });
     return 0;
 }

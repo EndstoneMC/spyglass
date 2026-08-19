@@ -7,7 +7,7 @@
 
 namespace spyglass::overlay {
 
-/** The ImGui windows. Reads a snapshot of the store; never touches the hook. */
+/** The ImGui windows. Draws from a snapshot of the store. */
 class View {
 public:
     void draw();

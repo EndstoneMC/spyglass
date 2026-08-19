@@ -6,11 +6,7 @@
 
 namespace spyglass::overlay {
 
-/**
- * Subclasses the game's window so ImGui sees input. While the overlay is visible
- * the messages it wants are swallowed, so the game does not also act on the click
- * that pressed a button.
- */
+// Subclasses the game window so ImGui sees input, and swallows what the overlay uses.
 class InputHook {
 public:
     struct Callbacks {

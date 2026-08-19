@@ -1,8 +1,11 @@
 #include "spyglass/diagnostics/store.h"
 
-#include "spyglass/core/config.h"
-
 namespace spyglass {
+namespace {
+
+constexpr std::size_t kHistoryLimit = 200;
+
+}  // namespace
 
 void DiagnosticStore::add(Diagnostic diagnostic)
 {
@@ -10,7 +13,7 @@ void DiagnosticStore::add(Diagnostic diagnostic)
 
     const std::lock_guard lock{mutex_};
     entries_.push_back(std::move(entry));
-    while (entries_.size() > config().history_limit) {
+    while (entries_.size() > kHistoryLimit) {
         entries_.pop_front();
     }
     total_.fetch_add(1, std::memory_order_relaxed);

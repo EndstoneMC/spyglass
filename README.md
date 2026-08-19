@@ -19,25 +19,21 @@
 If you write server software, a proxy, or a protocol translation layer, the client's side of a protocol bug is
 normally invisible: the connection drops, or the world quietly comes out wrong, and nothing tells you which packet
 was at fault. Spyglass sits inside the client and reports the failure the moment it happens — which packet, how far
-into it the decode got, and the reason the client rejected it. It is the Windows counterpart to
-[dobby](https://github.com/evc24004/dobby), which does the same job for the Android client under mcpelauncher.
+into it the decode got, and the reason the client rejected it.
 
 ## What a report looks like
 
 ```
-SPYGLASS PACKET DIAGNOSTIC
-2026-08-11T18:04:22.417Z | server -> client
-
-CraftingDataPacket (52 / 0x34)
+2026-08-11T18:04:22.417Z  CraftingDataPacket (52 / 0x34)
 Decode failed: generic:22
-Cursor 1180/4096 | body starts at 3 | unread 2916 | overflow no
+Cursor 1180/4096, body starts at 3, 2916 unread
 
 Bedrock call stack (innermost first):
   ReadOnlyBinaryStream.cpp:61  Read overflow
   CraftingDataPacket.cpp:212
   Packet.cpp:57
 
-Raw body ('>' marks the cursor):
+Body ('>' marks the cursor):
   000003  0a 00 00 00 04 6d 69 6e 65 63 72 61 66 74 3a 63
 > 000493  1f 8b 08 00 00 00 00 00 00 03 ed 5d 6b 73 db 38
 ```
@@ -85,20 +81,11 @@ Everything also goes to `%LOCALAPPDATA%\spyglass`:
 | --- | --- |
 | `spyglass.log` | one line per diagnostic, plus startup and status |
 | `events.jsonl` | one JSON object per diagnostic, including the raw bytes as hex |
-| `latest.txt` | the most recent report |
 | `overlay.ini` | overlay window layout |
 
-Set these before launching the client to change the defaults:
-
-| variable | default | |
-| --- | --- | --- |
-| `SPYGLASS_OUTPUT_DIR` | `%LOCALAPPDATA%\spyglass` | where output goes |
-| `SPYGLASS_RAW_CAPTURE_LIMIT` | `2048` | bytes of packet body captured |
-| `SPYGLASS_HISTORY_LIMIT` | `200` | diagnostics kept in the overlay |
-| `SPYGLASS_TRAILING_BYTES` | `1` | set `0` to report decode failures only |
-| `SPYGLASS_WRITE_EVENTS` | `1` | set `0` for overlay only, nothing written |
-
 ## Client Versions
+
+Tested on 1.26.4x stable and 1.26.5x preview, on Windows.
 
 Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied to a single release. It
 will not guess, though: if a pattern no longer matches exactly one place, it refuses to install that hook and says

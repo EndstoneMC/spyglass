@@ -4,21 +4,18 @@
 #include <atomic>
 #include <string_view>
 
-#include "spyglass/core/config.h"
 #include "spyglass/core/time.h"
 
 namespace spyglass {
 namespace {
 
+constexpr std::size_t kRawCaptureLimit = 2048;
 constexpr std::size_t kMaximumFrames = 32;
 constexpr std::size_t kMaximumStringLength = 4096;
 constexpr std::size_t kMaximumBranchDepth = 4;
 
-/**
- * Copies a client-owned view only when it looks like one. A wrong struct layout
- * shows up here as a wild pointer or an absurd length, and yields an empty
- * string rather than a fault inside the game's network thread.
- */
+// A wrong struct layout shows up here as a wild pointer or an absurd length. Yield an
+// empty string rather than fault inside the game's network thread.
 std::string copy_view(const std::string_view value)
 {
     if (value.data() == nullptr || value.size() > kMaximumStringLength) {
@@ -76,8 +73,8 @@ Diagnostic build(const Packet &packet, const ReadOnlyBinaryStream &stream, const
     };
 
     if (error != nullptr) {
-        // error_code::message() would allocate with the client's CRT and free with
-        // ours; name() only returns a literal, and the readable text is in the frames.
+        // message() would allocate with the client's CRT and free with ours. name() only
+        // returns a literal, and the readable text is in the frames.
         diagnostic.error_category = error->error.category().name();
         diagnostic.error_value = error->error.value();
         collect(*error, 0, diagnostic.frames);
@@ -85,7 +82,7 @@ Diagnostic build(const Packet &packet, const ReadOnlyBinaryStream &stream, const
 
     if (const auto view = stream.getView(); body_begin < view.size()) {
         const auto available = view.size() - body_begin;
-        const auto count = std::min(available, config().raw_capture_limit);
+        const auto count = std::min(available, kRawCaptureLimit);
         const auto *body = reinterpret_cast<const std::uint8_t *>(view.data()) + body_begin;
         diagnostic.raw.assign(body, body + count);
         diagnostic.raw_truncated = count < available;

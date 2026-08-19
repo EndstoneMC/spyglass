@@ -11,11 +11,8 @@
 
 namespace spyglass {
 
-/**
- * Diagnostics are produced on the network thread and read on the render thread.
- * Entries are shared and immutable once stored, so the overlay copies a vector of
- * handles under the lock and then draws without holding it.
- */
+// Written on the network thread and read on the render thread, so the overlay takes its
+// handles under the lock and draws without holding it.
 using DiagnosticHandle = std::shared_ptr<const Diagnostic>;
 
 class DiagnosticStore {

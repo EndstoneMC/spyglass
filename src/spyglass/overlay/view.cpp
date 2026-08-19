@@ -5,7 +5,7 @@
 
 #include <imgui.h>
 
-#include "spyglass/core/config.h"
+#include "spyglass/core/output.h"
 #include "spyglass/diagnostics/format.h"
 #include "spyglass/hook/packet.h"
 
@@ -156,13 +156,12 @@ void View::draw_detail(const std::vector<DiagnosticHandle> &entries)
 
 void View::draw_status(const std::size_t retained)
 {
-    // Packets read is the positive control: zero here means the hook is not on the
-    // client's receive path, which looks identical to a session with nothing wrong.
+    // Zero packets read means the hook is not on the client's receive path, which
+    // otherwise looks exactly like a session with nothing wrong.
     const auto read = packets_observed();
-    ImGui::TextColored(read == 0 ? kDecodeError : kMuted, "%llu packets read",
-                       static_cast<unsigned long long>(read));
+    ImGui::TextColored(read == 0 ? kDecodeError : kMuted, "%llu packets read", static_cast<unsigned long long>(read));
     ImGui::SameLine();
-    ImGui::TextColored(kMuted, " |  %zu retained  |  %s", retained, config().output_directory.string().c_str());
+    ImGui::TextColored(kMuted, " |  %zu retained  |  %s", retained, output_directory().string().c_str());
 }
 
 }  // namespace spyglass::overlay

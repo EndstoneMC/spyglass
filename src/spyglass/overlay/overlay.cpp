@@ -1,7 +1,7 @@
 #include "spyglass/overlay/overlay.h"
 
-#include <atomic>
 #include <optional>
+#include <stdexcept>
 
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -9,8 +9,8 @@
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 
-#include "spyglass/core/config.h"
 #include "spyglass/core/log.h"
+#include "spyglass/core/output.h"
 #include "spyglass/overlay/d3d11_backend.h"
 #include "spyglass/overlay/d3d12_backend.h"
 
@@ -29,37 +29,36 @@ using PresentFn = HRESULT(IDXGISwapChain *, UINT, UINT);
 using ResizeBuffersFn = HRESULT(IDXGISwapChain *, UINT, UINT, UINT, DXGI_FORMAT, UINT);
 using ExecuteCommandListsFn = void(ID3D12CommandQueue *, UINT, ID3D12CommandList *const *);
 
+PresentFn *g_present = nullptr;
+ResizeBuffersFn *g_resize_buffers = nullptr;
+ExecuteCommandListsFn *g_execute_command_lists = nullptr;
+
 bool os_cursor_visible()
 {
     CURSORINFO cursor{.cbSize = sizeof(CURSORINFO)};
     if (GetCursorInfo(&cursor) == 0) {
         return false;
     }
-    // A hidden cursor is either one ShowCursor took away or one left without an image.
     return (cursor.flags & CURSOR_SHOWING) != 0 && cursor.hCursor != nullptr;
 }
-
-std::atomic<PresentFn *> g_present{nullptr};
-std::atomic<ResizeBuffersFn *> g_resize_buffers{nullptr};
-std::atomic<ExecuteCommandListsFn *> g_execute_command_lists{nullptr};
 
 HRESULT present_detour(IDXGISwapChain *swap_chain, const UINT sync_interval, const UINT flags)
 {
     Overlay::instance().present(swap_chain);
-    return g_present.load(std::memory_order_relaxed)(swap_chain, sync_interval, flags);
+    return g_present(swap_chain, sync_interval, flags);
 }
 
 HRESULT resize_buffers_detour(IDXGISwapChain *swap_chain, const UINT buffer_count, const UINT width, const UINT height,
                               const DXGI_FORMAT format, const UINT flags)
 {
     Overlay::instance().before_resize();
-    return g_resize_buffers.load(std::memory_order_relaxed)(swap_chain, buffer_count, width, height, format, flags);
+    return g_resize_buffers(swap_chain, buffer_count, width, height, format, flags);
 }
 
 void execute_command_lists_detour(ID3D12CommandQueue *queue, const UINT count, ID3D12CommandList *const *lists)
 {
     Overlay::instance().observe_command_queue(queue);
-    g_execute_command_lists.load(std::memory_order_relaxed)(queue, count, lists);
+    g_execute_command_lists(queue, count, lists);
 }
 
 void **vtable_of(void *object)
@@ -67,14 +66,13 @@ void **vtable_of(void *object)
     return *static_cast<void ***>(object);
 }
 
-/** A hidden window is enough to create the throwaway swap chain we read the vtable from. */
 struct ProbeWindow {
     HWND handle{nullptr};
 
     ProbeWindow()
     {
-        handle = CreateWindowExW(0, L"STATIC", L"", WS_OVERLAPPEDWINDOW, 0, 0, 8, 8, nullptr, nullptr, nullptr,
-                                 nullptr);
+        handle =
+            CreateWindowExW(0, L"STATIC", L"", WS_OVERLAPPEDWINDOW, 0, 0, 8, 8, nullptr, nullptr, nullptr, nullptr);
     }
     ~ProbeWindow()
     {
@@ -86,6 +84,7 @@ struct ProbeWindow {
     ProbeWindow &operator=(const ProbeWindow &) = delete;
 };
 
+// A throwaway swap chain of our own shares its vtable with the game's.
 std::optional<std::pair<void *, void *>> probe_swap_chain()
 {
     const ProbeWindow window;
@@ -159,9 +158,9 @@ void Overlay::install()
     resize_hook_ = hook::FunctionHook{"IDXGISwapChain::ResizeBuffers", swap_chain->second,
                                       reinterpret_cast<void *>(&resize_buffers_detour),
                                       reinterpret_cast<void **>(&g_resize_buffers)};
-    present_hook_ = hook::FunctionHook{"IDXGISwapChain::Present", swap_chain->first,
-                                       reinterpret_cast<void *>(&present_detour),
-                                       reinterpret_cast<void **>(&g_present)};
+    present_hook_ =
+        hook::FunctionHook{"IDXGISwapChain::Present", swap_chain->first, reinterpret_cast<void *>(&present_detour),
+                           reinterpret_cast<void **>(&g_present)};
 }
 
 void Overlay::shutdown()
@@ -195,15 +194,11 @@ void Overlay::create_context()
 
     auto &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    settings_path_ = (config().output_directory / "overlay.ini").string();
+    settings_path_ = (output_directory() / "overlay.ini").string();
     io.IniFilename = settings_path_.c_str();
     context_ready_ = true;
 }
 
-/**
- * Sizes and fonts are rebuilt from the defaults on every change: ScaleAllSizes
- * multiplies what it is given, so applying it to an already scaled style compounds.
- */
 void Overlay::follow_window_dpi()
 {
     const auto scale = ImGui_ImplWin32_GetDpiScaleForHwnd(window_);
@@ -211,6 +206,7 @@ void Overlay::follow_window_dpi()
         return;
     }
 
+    // ScaleAllSizes multiplies what it is given, so start from the defaults every time.
     ImGuiStyle style;
     ImGui::StyleColorsDark(&style);
     style.ScaleAllSizes(scale);
@@ -247,8 +243,7 @@ bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
         backend_ = D3D11Backend::create(swap_chain);
     }
     if (!backend_) {
-        // A D3D12 swap chain whose queue has not run yet is normal for the first few
-        // frames; only give up once the swap chain turns out to be neither.
+        // A D3D12 swap chain whose queue has not run yet is normal for the first frames.
         ComPtr<ID3D12Device> device;
         if (FAILED(swap_chain->GetDevice(IID_PPV_ARGS(&device)))) {
             unsupported_ = true;
@@ -267,7 +262,7 @@ void Overlay::present(IDXGISwapChain *swap_chain)
 
     follow_window_dpi();
 
-    // Gameplay hides the OS cursor, so ImGui has to draw one; the game's UI screens
+    // Gameplay hides the OS cursor, so ImGui has to draw one. The game's own screens
     // show it again, and drawing ours on top of that is what puts two on screen.
     ImGui::GetIO().MouseDrawCursor = !os_cursor_visible();
 

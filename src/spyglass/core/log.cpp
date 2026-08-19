@@ -5,27 +5,20 @@
 
 #include <Windows.h>
 
-#include "spyglass/core/config.h"
+#include "spyglass/core/output.h"
 #include "spyglass/core/time.h"
 
 namespace spyglass::log {
-namespace {
-
-std::mutex &mutex()
-{
-    static std::mutex mutex;
-    return mutex;
-}
-
-}  // namespace
 
 void write(const std::string_view level, const std::string_view message)
 {
+    static std::mutex mutex;
+
     const auto line = std::format("[{}] [{}] {}\n", timestamp(), level, message);
     OutputDebugStringA(line.c_str());
 
-    const std::lock_guard lock{mutex()};
-    if (std::ofstream out{log_path(), std::ios::app}; out) {
+    const std::lock_guard lock{mutex};
+    if (std::ofstream out{output_directory() / L"spyglass.log", std::ios::app}; out) {
         out << line;
     }
 }

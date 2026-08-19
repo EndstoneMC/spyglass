@@ -73,11 +73,8 @@ std::wstring_view arguments_of(const std::wstring_view command_line)
     return start == std::wstring_view::npos ? std::wstring_view{} : rest.substr(start);
 }
 
-/**
- * Runs this command again through the "runas" verb, which is what raises the UAC
- * prompt. The arguments are handed over as they were typed rather than rebuilt from
- * argv, so nothing has to be re-quoted.
- */
+// Runs this command again through the "runas" verb, which is what raises the UAC prompt.
+// The arguments go over as they were typed, so nothing has to be re-quoted.
 int relaunch_elevated()
 {
     std::wstring self(MAX_PATH, L'\0');
@@ -111,10 +108,8 @@ int relaunch_elevated()
     return static_cast<int>(code);
 }
 
-/**
- * An elevated run gets a console of its own, and that console dies with the process.
- * Hold it open so whatever was printed can be read; a shared console is left alone.
- */
+// An elevated run gets a console of its own, and that console dies with the process.
+// A shared one is left alone.
 struct ConsoleHold {
     ~ConsoleHold()
     {
@@ -160,11 +155,8 @@ bool module_loaded(const DWORD pid, const std::wstring &name)
     return false;
 }
 
-/**
- * Minecraft runs in an AppContainer, and that token cannot map a file the package
- * SID has no rights to. Both the payload and the directory holding it need an ACE
- * for ALL APPLICATION PACKAGES before LoadLibraryW will succeed inside the game.
- */
+// Minecraft runs in an AppContainer, so the payload and the directory holding it need an
+// ACE for ALL APPLICATION PACKAGES before LoadLibraryW succeeds inside the game.
 bool grant_app_package_access(const std::filesystem::path &path, const bool inherit)
 {
     std::vector<std::byte> storage(SECURITY_MAX_SID_SIZE);

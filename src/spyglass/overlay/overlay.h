@@ -13,11 +13,6 @@
 
 namespace spyglass::overlay {
 
-/**
- * Owns the ImGui context and everything that feeds it. The swap chain vtable is
- * read from a throwaway device at startup, so the game's own swap chain is covered
- * whether it already exists or not.
- */
 class Overlay {
 public:
     static Overlay &instance();

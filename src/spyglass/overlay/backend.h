@@ -4,11 +4,6 @@
 
 namespace spyglass::overlay {
 
-/**
- * Draws the current ImGui frame onto the swap chain's back buffer. Implementations
- * run inside the game's Present call, on the game's render thread, and must leave
- * the device state as they found it.
- */
 class RenderBackend {
 public:
     RenderBackend() = default;

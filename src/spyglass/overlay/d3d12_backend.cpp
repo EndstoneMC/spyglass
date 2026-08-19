@@ -14,11 +14,7 @@ namespace {
 
 constexpr std::uint32_t kShaderResourceDescriptors = 64;
 
-/**
- * ImGui allocates SRV descriptors for the font atlas and for any texture a caller
- * registers, so it needs an allocator rather than a single slot. This hands out
- * indices from one shader-visible heap owned by the backend.
- */
+// ImGui allocates an SRV descriptor per texture, so it needs more than a single slot.
 struct DescriptorAllocator {
     ID3D12DescriptorHeap *heap{nullptr};
     std::vector<bool> *slots{nullptr};
