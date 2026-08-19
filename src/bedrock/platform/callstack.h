@@ -18,23 +18,23 @@ struct CallStack {
         std::string_view filename;
         std::uint32_t line;
     };
-    BEDROCK_STATIC_ASSERT_SIZE(Frame, 32);
+    BEDROCK_STATIC_ASSERT_SIZE(Frame, 32, 32);
 
     struct Context {
         std::string value;
         std::optional<LogLevel> log_level;
         std::optional<BedrockLog::LogAreaID> log_area;
     };
-    BEDROCK_STATIC_ASSERT_SIZE(Context, 48);
+    BEDROCK_STATIC_ASSERT_SIZE(Context, 48, 40);
 
     struct FrameWithContext {
         Frame frame;
         std::optional<Context> context;
     };
-    BEDROCK_STATIC_ASSERT_SIZE(FrameWithContext, 88);
+    BEDROCK_STATIC_ASSERT_SIZE(FrameWithContext, 88, 80);
 
     std::vector<FrameWithContext> frames;
 };
-BEDROCK_STATIC_ASSERT_SIZE(CallStack, 24);
+BEDROCK_STATIC_ASSERT_SIZE(CallStack, 24, 24);
 
 }  // namespace Bedrock

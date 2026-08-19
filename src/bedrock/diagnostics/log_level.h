@@ -22,6 +22,6 @@ private:
     Type type_;
     bool log_in_publish_{false};
 };
-BEDROCK_STATIC_ASSERT_SIZE(LogLevel, 2);
+BEDROCK_STATIC_ASSERT_SIZE(LogLevel, 2, 2);
 
 }  // namespace Bedrock

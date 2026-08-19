@@ -14,6 +14,6 @@ struct ErrorInfo {
     CallStack call_stack;
     std::vector<ErrorInfo> branches;
 };
-BEDROCK_STATIC_ASSERT_SIZE(ErrorInfo<std::error_code>, 64);
+BEDROCK_STATIC_ASSERT_SIZE(ErrorInfo<std::error_code>, 64, 64);
 
 }  // namespace Bedrock
