@@ -43,6 +43,9 @@ two sides disagree about a field.
 
 ## Quick Start
 
+Unpack `spyglass-vX.Y.Z-windows-x64.zip` from the
+[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below.
+
 Start Minecraft, then run the injector:
 
 ```shell

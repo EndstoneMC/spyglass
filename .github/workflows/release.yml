@@ -1,0 +1,172 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.1.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Preview without making changes"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    name: Prepare release
+    if: github.repository == 'EndstoneMC/spyglass'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate release
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+          if git tag -l "v$VERSION" | grep -q .; then
+            echo "::error::Tag v$VERSION already exists"
+            exit 1
+          fi
+          if [[ "${{ inputs.dry_run }}" != "true" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "::error::Non-dry-run releases must run from main"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+          echo "PREVIOUS_TAG=$(git tag --sort=-v:refname | head -n 1)" >> "$GITHUB_ENV"
+
+      - name: Extract unreleased changelog
+        run: |
+          BODY=$(sed -n '/^## \[Unreleased\]/,/^## \[/{/^## \[/d; p}' CHANGELOG.md | grep -v '^\[[^]]*\]: http')
+          BODY=$(echo "$BODY" | sed '/./,$!d' | sed -e :a -e '/^\n*$/{$d;N;ba}')
+          if [ -z "$BODY" ]; then
+            echo "::error::Unreleased section in CHANGELOG.md is empty"
+            exit 1
+          fi
+          echo "$BODY" > /tmp/release_body.md
+          echo "Release notes:"
+          cat /tmp/release_body.md
+
+      - name: Update release files
+        run: |
+          sed -E -i "s/^project\(spyglass VERSION [0-9]+\.[0-9]+\.[0-9]+ LANGUAGES CXX\)$/project(spyglass VERSION $VERSION LANGUAGES CXX)/" CMakeLists.txt
+          sed -i "s|^## \[Unreleased\]|## [Unreleased]\n\n## [$VERSION] - $DATE|" CHANGELOG.md
+          if [ -n "$PREVIOUS_TAG" ]; then
+            RELEASED="[$VERSION]: https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...v$VERSION"
+          else
+            RELEASED="[$VERSION]: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          fi
+          sed -i "s|^\[Unreleased\]: .*|[Unreleased]: https://github.com/${{ github.repository }}/compare/v$VERSION...HEAD\n$RELEASED|" CHANGELOG.md
+
+      - name: Verify release files
+        run: |
+          grep -Fx "project(spyglass VERSION $VERSION LANGUAGES CXX)" CMakeLists.txt
+          test "$(grep -Fc "## [$VERSION] - $DATE" CHANGELOG.md)" -eq 1
+          test "$(grep -Fc "[$VERSION]: https" CHANGELOG.md)" -eq 1
+          git diff -- CMakeLists.txt CHANGELOG.md
+
+      - name: Preview
+        if: inputs.dry_run
+        run: |
+          echo "=== Dry Run ==="
+          echo "Ref: ${{ github.ref }}"
+          echo "Version: $VERSION"
+          echo "Tag: v$VERSION"
+          echo "Date: $DATE"
+          echo "Previous tag: ${PREVIOUS_TAG:-none}"
+          echo
+          echo "=== Release notes ==="
+          cat /tmp/release_body.md
+
+      - name: Commit and tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt CHANGELOG.md
+          git commit -m "Release $VERSION"
+          git tag "v$VERSION"
+          git push --atomic origin HEAD:main "refs/tags/v$VERSION"
+
+      - name: Create GitHub release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$PREVIOUS_TAG" ]; then
+            printf '\n**Full Changelog**: https://github.com/%s/compare/%s...v%s\n' \
+              "${{ github.repository }}" "$PREVIOUS_TAG" "$VERSION" >> /tmp/release_body.md
+          fi
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file /tmp/release_body.md
+
+  windows:
+    name: Windows
+    if: ${{ !inputs.dry_run }}
+    needs: release
+    runs-on: windows-2022
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+        with:
+          ref: v${{ inputs.version }}
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86_64
+
+      - name: Set up CMake and Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Restore Conan cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .conan2/p
+          key: ${{ runner.os }}-conan-${{ hashFiles('conanfile.txt', '.conan2/profiles/*') }}
+          restore-keys: |
+            ${{ runner.os }}-conan-
+
+      - name: Install dependencies with Conan
+        run: conan install . --build=missing
+
+      - name: Build with CMake
+        run: |
+          cmake --preset conan-relwithdebinfo
+          cmake --build --preset conan-relwithdebinfo
+
+      - name: Stage artifact
+        shell: pwsh
+        run: |
+          cmake --install build/RelWithDebInfo --prefix dist
+          Copy-Item build/RelWithDebInfo/spyglass.pdb dist
+
+      - name: Package
+        shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath spyglass-v${{ inputs.version }}-windows-x64.zip
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "v${{ inputs.version }}" "spyglass-v${{ inputs.version }}-windows-x64.zip" --clobber
