@@ -104,9 +104,10 @@ can be read, and the packet worth looking at is usually gone by the time you rea
 while paused, so nothing is lost from the capture.
 
 `Record` writes every packet to `traffic.bin` in the output directory for as long as it is on, bodies and all, so
-a whole session survives even though the window on screen only holds the last thousand. It is the bytes rather
-than a description of them, because `spyglass.log` and `events.jsonl` already describe. The file is a header and
-then one record per packet, little endian throughout:
+a whole session survives even though the window on screen only holds the last thousand. It is the only complete
+record kept: `spyglass.log` and `events.jsonl` hold diagnostics alone, so a packet that decoded cleanly is in
+neither of them. The bytes go down as they arrived rather than as text about them, so a packet can be fed back
+into a decoder afterwards. The file is a header and then one record per packet, little endian throughout:
 
 | | |
 | --- | --- |

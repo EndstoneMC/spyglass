@@ -66,8 +66,8 @@ std::vector<std::uint8_t> packet_body(std::uint64_t sequence);
 
 /**
  * Whether to write every packet to `traffic.bin` as it arrives, bodies and all. The window on
- * screen only holds the last thousand, so this is how a whole session is kept. It is the bytes
- * rather than a description of them, since spyglass.log and events.jsonl already describe.
+ * screen only holds the last thousand, and the log and the JSONL hold diagnostics alone, so this
+ * is the only place a packet that decoded cleanly is recorded at all.
  */
 void set_recording(bool enabled);
 bool recording();
