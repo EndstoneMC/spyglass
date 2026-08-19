@@ -117,7 +117,10 @@ void View::draw_recent()
     }
     const auto &recent = live_;
 
-    ImGui::Checkbox("Pause", &paused_);
+    if (ImGui::Checkbox("Pause", &paused_)) {
+        // Whatever is on screen keeps its body, rather than it rolling away underneath.
+        set_body_hold(paused_);
+    }
     ImGui::SameLine();
 
     bool capturing = body_capture();
@@ -228,7 +231,8 @@ void View::draw_body()
     if (body.empty()) {
         ImGui::TextColored(kMuted, selected_packet_ == 0
                                        ? "Select a packet to see its body."
-                                       : "No body kept for this one. Turn on 'Keep bodies' and reproduce.");
+                                       : "No body kept for this one. Only the most recent are held, so turn on "
+                                         "'Keep bodies' and reproduce, or 'Record' to keep every one on disk.");
         return;
     }
 

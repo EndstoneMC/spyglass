@@ -54,6 +54,13 @@ std::vector<PacketRecord> recent_packets();
 void set_body_capture(bool enabled);
 bool body_capture();
 
+/**
+ * Stops kept bodies being overwritten. Holding the list still on screen is no use if the bodies
+ * behind it carry on rolling, which is what happens otherwise: packets keep arriving whether or
+ * not anyone is looking.
+ */
+void set_body_hold(bool held);
+
 /** The retained body for `sequence`, empty once it has aged out or was never captured. */
 std::vector<std::uint8_t> packet_body(std::uint64_t sequence);
 

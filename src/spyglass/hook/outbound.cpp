@@ -38,12 +38,15 @@ namespace spyglass::hook {
 namespace {
 
 /**
- * Packet's virtuals run: the two destructors, getId, getName, the size ceiling, checkSize, then
- * write and its no-argument forwarder, and the read that readNoHeader dispatches through. Only the
- * read slot is known for certain, from the call readNoHeader makes, so it is what the numbering is
- * checked against before anything is written.
+ * Packet's virtuals run: the two destructors, getId, getName, the size ceiling, checkSize, write,
+ * a forwarding overload of it, the base read, and the read that readNoHeader dispatches through.
+ * Only the last is known for certain, from the call readNoHeader makes, so it is what the
+ * numbering is checked against before anything is written.
+ *
+ * Write is the one the client calls, not the forwarder after it, which nothing appears to use. The
+ * forwarder reads the slot patched here on its way past, so patching write alone covers both.
  */
-constexpr std::size_t kWriteSlot = 7;
+constexpr std::size_t kWriteSlot = 6;
 constexpr std::size_t kReadSlot = 9;
 constexpr std::size_t kSlotsNeeded = 10;
 

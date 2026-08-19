@@ -94,9 +94,12 @@ std::uint64_t elapsed_ms()
 
 // Bodies are kept in their own short ring, because they are orders of magnitude larger than the
 // records and only the last handful are ever worth reading.
-constexpr std::size_t kBodyLimit = 64;
+constexpr std::size_t kBodyLimit = 256;
 constexpr std::size_t kBodyBytes = 256 * 1024;
+// Chunk bodies are large enough that the slot count alone is not a bound worth relying on.
+constexpr std::size_t kBodyBudget = 32 * 1024 * 1024;
 std::atomic_bool g_capture_bodies{false};
+std::atomic_bool g_body_hold{false};
 
 struct BodyEntry {
     std::uint64_t sequence{0};
@@ -106,9 +109,14 @@ struct BodyEntry {
 std::mutex g_body_mutex;
 std::array<BodyEntry, kBodyLimit> g_bodies;
 std::size_t g_body_written = 0;
+std::size_t g_body_bytes = 0;
 
 void capture(const std::uint64_t sequence, const ReadOnlyBinaryStream &stream, const std::size_t body_begin)
 {
+    if (g_body_hold.load(std::memory_order_relaxed)) {
+        return;
+    }
+
     const auto view = stream.getView();
     if (view.data() == nullptr || view.size() <= body_begin) {
         return;
@@ -118,9 +126,20 @@ void capture(const std::uint64_t sequence, const ReadOnlyBinaryStream &stream, c
 
     const std::lock_guard lock{g_body_mutex};
     auto &slot = g_bodies[g_body_written % kBodyLimit];
+    g_body_bytes -= slot.body.size();
     slot.sequence = sequence;
     slot.body.assign(begin, begin + size);
+    g_body_bytes += slot.body.size();
     ++g_body_written;
+
+    // Oldest first, until what is held fits the budget again.
+    for (std::size_t i = 0; g_body_bytes > kBodyBudget && i + 1 < kBodyLimit; ++i) {
+        auto &oldest = g_bodies[(g_body_written + i) % kBodyLimit];
+        g_body_bytes -= oldest.body.size();
+        oldest.body.clear();
+        oldest.body.shrink_to_fit();
+        oldest.sequence = 0;
+    }
 }
 
 std::atomic_bool g_recording{false};
@@ -332,6 +351,11 @@ void set_body_capture(const bool enabled)
 bool body_capture()
 {
     return g_capture_bodies.load(std::memory_order_relaxed);
+}
+
+void set_body_hold(const bool held)
+{
+    g_body_hold.store(held, std::memory_order_relaxed);
 }
 
 std::vector<std::uint8_t> packet_body(const std::uint64_t sequence)

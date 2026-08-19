@@ -99,9 +99,9 @@ Both separate "the client never received this" from "the client received it and 
 distinction matters more than it sounds: a packet the client does not recognise never reaches the decode path at
 all, so it can never raise a diagnostic, and its absence from the list is the only evidence you get.
 
-`Pause` holds the list still. A world loading in arrives faster than anything can be read, and the packet worth
-looking at is usually gone by the time you reach for it. Nothing is lost while paused, the window keeps filling
-underneath.
+`Pause` holds the list still, and holds the kept bodies with it. A world loading in arrives faster than anything
+can be read, and the packet worth looking at is usually gone by the time you reach for it. Recording carries on
+while paused, so nothing is lost from the capture.
 
 `Record` writes every packet to `traffic.bin` in the output directory for as long as it is on, bodies and all, so
 a whole session survives even though the window on screen only holds the last thousand. It is the bytes rather
