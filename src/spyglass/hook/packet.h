@@ -57,4 +57,15 @@ bool body_capture();
 /** The retained body for `sequence`, empty once it has aged out or was never captured. */
 std::vector<std::uint8_t> packet_body(std::uint64_t sequence);
 
+/**
+ * Whether to append every packet to `traffic.log` as it arrives. The window on screen only holds
+ * the last thousand, so this is how a session is kept whole. With body capture on as well, each
+ * line carries the body too, which is complete but grows quickly.
+ */
+void set_recording(bool enabled);
+bool recording();
+
+/** Where the recording is being written, empty when it is off. */
+std::string recording_path();
+
 }  // namespace spyglass

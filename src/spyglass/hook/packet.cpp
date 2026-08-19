@@ -4,6 +4,8 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <fstream>
+#include <format>
 #include <exception>
 #include <mutex>
 #include <string_view>
@@ -20,6 +22,8 @@
 #include "bedrock/network/packet.h"
 #include "bedrock/platform/result.h"
 #include "spyglass/core/log.h"
+#include "spyglass/core/output.h"
+#include "spyglass/core/time.h"
 #include "spyglass/diagnostics/builder.h"
 #include "spyglass/diagnostics/sink.h"
 #include "spyglass/hook/function_hook.h"
@@ -120,10 +124,17 @@ void capture(const std::uint64_t sequence, const ReadOnlyBinaryStream &stream, c
     ++g_body_written;
 }
 
+std::atomic_bool g_recording{false};
+std::mutex g_file_mutex;
+std::ofstream g_file;
+std::string g_file_path;
+
 constexpr std::size_t kRecentLimit = 1024;
 std::mutex g_recent_mutex;
 std::array<RecentEntry, kRecentLimit> g_recent{};
 std::size_t g_recent_written = 0;
+
+void append(const RecentEntry &entry, std::string_view name, const std::uint8_t *body, std::size_t body_size);
 
 void record(const Packet &packet, const ReadOnlyBinaryStream &stream, const std::size_t body_begin, const bool failed)
 {
@@ -139,13 +150,50 @@ void record(const Packet &packet, const ReadOnlyBinaryStream &stream, const std:
         .outbound = false,
     };
 
-    if (g_capture_bodies.load(std::memory_order_relaxed)) {
+    const auto view = stream.getView();
+    const auto *body = view.data() != nullptr && view.size() > body_begin
+                           ? reinterpret_cast<const std::uint8_t *>(view.data()) + body_begin
+                           : nullptr;
+    const auto keeping = g_capture_bodies.load(std::memory_order_relaxed);
+    if (keeping) {
         capture(entry.sequence, stream, body_begin);
     }
+    append(entry, packet.getName(), keeping ? body : nullptr, keeping ? entry.body_size : 0);
 
     const std::lock_guard lock{g_recent_mutex};
     g_recent[g_recent_written % kRecentLimit] = entry;
     ++g_recent_written;
+}
+
+void append(const RecentEntry &entry, const std::string_view name, const std::uint8_t *body,
+            const std::size_t body_size)
+{
+    if (!g_recording.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    auto line = std::format("{:>8}.{:03} t{:<6} {:<3} {} ({})", entry.at / 1000, entry.at % 1000, entry.thread,
+                            entry.outbound ? "out" : "in", name, entry.id);
+    if (!entry.outbound) {
+        line += std::format(" {} bytes", entry.body_size);
+    }
+    if (entry.unread != 0) {
+        line += std::format(" {} unread", entry.unread);
+    }
+    if (entry.failed) {
+        line += " DECODE FAILED";
+    }
+    if (body != nullptr && body_size != 0) {
+        line += " ";
+        for (std::size_t i = 0; i < body_size; ++i) {
+            std::format_to(std::back_inserter(line), "{:02x}", body[i]);
+        }
+    }
+
+    const std::lock_guard lock{g_file_mutex};
+    if (g_file) {
+        g_file << line << '\n';
+    }
 }
 
 void count(const Packet &packet)
@@ -220,6 +268,8 @@ void note_outbound(const Packet &packet)
         .outbound = true,
     };
 
+    append(entry, packet.getName(), nullptr, 0);
+
     const std::lock_guard lock{g_recent_mutex};
     g_recent[g_recent_written % kRecentLimit] = entry;
     ++g_recent_written;
@@ -228,6 +278,46 @@ void note_outbound(const Packet &packet)
 std::uint64_t packets_observed()
 {
     return g_observed.load(std::memory_order_relaxed);
+}
+
+void set_recording(const bool enabled)
+{
+    const std::lock_guard lock{g_file_mutex};
+    if (enabled == g_recording.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    if (enabled) {
+        g_file_path = (output_directory() / "traffic.log").string();
+        // Appending keeps whatever earlier runs wrote, since a session that ended badly is
+        // usually the one worth reading.
+        g_file.open(g_file_path, std::ios::app);
+        if (g_file) {
+            g_file << std::format("--- recording from {} ---\n", timestamp());
+        }
+        else {
+            log::error("cannot write {}", g_file_path);
+            g_file_path.clear();
+            return;
+        }
+    }
+    else {
+        g_file.flush();
+        g_file.close();
+        g_file_path.clear();
+    }
+    g_recording.store(enabled, std::memory_order_relaxed);
+}
+
+bool recording()
+{
+    return g_recording.load(std::memory_order_relaxed);
+}
+
+std::string recording_path()
+{
+    const std::lock_guard lock{g_file_mutex};
+    return g_file_path;
 }
 
 void set_body_capture(const bool enabled)

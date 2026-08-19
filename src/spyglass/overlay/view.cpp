@@ -108,7 +108,15 @@ void View::draw_traffic()
 
 void View::draw_recent()
 {
-    const auto recent = recent_packets();
+    // Held still on request. The list is unreadable at the rate a loading world arrives at, and
+    // the packet worth looking at is usually already gone by the time you reach for it.
+    if (!paused_) {
+        live_ = recent_packets();
+    }
+    const auto &recent = live_;
+
+    ImGui::Checkbox("Pause", &paused_);
+    ImGui::SameLine();
 
     bool capturing = body_capture();
     if (ImGui::Checkbox("Keep bodies", &capturing)) {
@@ -130,7 +138,21 @@ void View::draw_recent()
         ImGui::TextColored(kDecodeError, "(%s)", outbound_error_.c_str());
     }
 
-    ImGui::TextColored(kMuted, "%zu shown, newest first", recent.size());
+    ImGui::SameLine();
+    bool writing = recording();
+    if (ImGui::Checkbox("Record", &writing)) {
+        set_recording(writing);
+    }
+
+    if (paused_) {
+        ImGui::TextColored(kTrailingBytes, "%zu held, newest first", recent.size());
+    }
+    else {
+        ImGui::TextColored(kMuted, "%zu shown, newest first", recent.size());
+    }
+    if (const auto path = recording_path(); !path.empty()) {
+        ImGui::TextColored(kMuted, "writing every packet to %s", path.c_str());
+    }
     ImGui::Separator();
 
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingStretchProp;

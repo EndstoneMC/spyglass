@@ -99,6 +99,14 @@ Both separate "the client never received this" from "the client received it and 
 distinction matters more than it sounds: a packet the client does not recognise never reaches the decode path at
 all, so it can never raise a diagnostic, and its absence from the list is the only evidence you get.
 
+`Pause` holds the list still. A world loading in arrives faster than anything can be read, and the packet worth
+looking at is usually gone by the time you reach for it. Nothing is lost while paused, the window keeps filling
+underneath.
+
+`Record` appends every packet to `traffic.log` in the output directory for as long as it is on, so a whole
+session survives even though the window on screen only holds the last thousand. Turn on `Keep bodies` as well and
+each line carries the body too, which is complete but grows quickly.
+
 Turn on `Keep bodies` and pick a packet to see its body as one unbroken hex run. `Save hex` writes it out in the
 form a decoder's hex loader wants, for replaying the packet offline.
 

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "spyglass/diagnostics/store.h"
+#include "spyglass/hook/packet.h"
 
 namespace spyglass::overlay {
 
@@ -37,6 +38,8 @@ private:
     std::uint64_t body_sequence_{0};
     std::string body_hex_;
     std::string outbound_error_;
+    bool paused_{false};
+    std::vector<PacketRecord> live_;
 };
 
 }  // namespace spyglass::overlay
