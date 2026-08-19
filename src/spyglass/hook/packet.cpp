@@ -24,10 +24,19 @@ namespace {
 
 // Every rip-relative displacement, branch target and frame offset is wildcarded, so
 // a relink of the same source does not invalidate this.
+#ifdef _WIN32
 constexpr std::string_view kReadNoHeaderPattern =
     "55 41 56 56 57 53 48 81 EC ? ? ? ? 48 8D AC 24 ? ? ? ? 0F 29 B5 ? ? ? ? "
     "48 C7 85 ? ? ? ? ? ? ? ? 48 89 D6 48 8B 85 ? ? ? ? 0F B6 00 88 41 10 "
     "48 8B 01 48 8B 40 48 48 8D 55 ? FF 15";
+#else
+// The tail is the body of the function rather than its prologue: the sub client id is copied
+// out of its reference into the packet, then the read itself goes through the vtable.
+constexpr std::string_view kReadNoHeaderPattern =
+    "55 48 89 E5 41 57 41 56 41 54 53 48 81 EC ? ? ? ? 48 89 FB "
+    "64 48 8B 04 25 28 00 00 00 48 89 45 ? 41 0F B6 00 88 46 10 "
+    "48 8B 06 48 8D BD ? ? ? ? FF 50 48";
+#endif
 
 using ReadNoHeader = Bedrock::Result<void>(Packet *, ReadOnlyBinaryStream &, const cereal::ReflectionCtx &,
                                            const SubClientId &);

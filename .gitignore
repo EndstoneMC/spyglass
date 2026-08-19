@@ -3,3 +3,4 @@ dist/
 CMakeUserPresets.json
 *.log
 *.jsonl
+build-android/
