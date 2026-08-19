@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-19
+
 ### Added
 
 - Packet decode diagnostics for the Minecraft: Bedrock client on Windows: which packet the
@@ -21,4 +23,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An injector that asks for elevation itself and grants the payload the rights a packaged app
   needs before loading it into the client.
 
-[Unreleased]: https://github.com/EndstoneMC/spyglass/commits/main
+[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/EndstoneMC/spyglass/releases/tag/v0.1.0
