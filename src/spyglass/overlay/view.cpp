@@ -1,15 +1,17 @@
 #include "spyglass/overlay/view.h"
 
 #include <algorithm>
+#include <exception>
 #include <format>
+#include <iterator>
 
 #include <imgui.h>
 
 #include "spyglass/core/output.h"
-#include "spyglass/overlay/clipboard.h"
 #include "spyglass/diagnostics/format.h"
 #include "spyglass/hook/outbound.h"
 #include "spyglass/hook/packet.h"
+#include "spyglass/overlay/clipboard.h"
 
 namespace spyglass::overlay {
 namespace {
