@@ -10,7 +10,7 @@ public:
     [[nodiscard]] bool visible() const noexcept { return visible_; }
 
 private:
-    bool visible_{false};
+    bool visible_{true};
 };
 
 }  // namespace spyglass
