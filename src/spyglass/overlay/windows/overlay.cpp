@@ -190,7 +190,7 @@ void Overlay::create_context()
     font.OversampleH = 1;
     font.OversampleV = 1;
     font.PixelSnapH = true;
-    io.Fonts->AddFontFromFileTTF(mojangles.string().c_str(), 13.0F, &font);
+    io.Fonts->AddFontFromFileTTF(mojangles.string().c_str(), 11.0F, &font);
 
     context_ready_ = true;
 }
