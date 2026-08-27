@@ -11,15 +11,26 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(spyglass SHARED src/spyglass/entry.cpp)
+add_subdirectory(third_party)
+
+add_library(spyglass SHARED src/spyglass/main.cpp)
 target_include_directories(spyglass PRIVATE src)
+target_link_libraries(spyglass PRIVATE
+        nonstd::expected-lite
+        funchook-static
+        imgui
+        libhat::libhat)
+
+if (ANDROID)
+    target_link_libraries(spyglass PRIVATE log)
+endif ()
 
 install(TARGETS spyglass RUNTIME DESTINATION . LIBRARY DESTINATION .)
 
 if (WIN32)
-    add_executable(spyglass_inject src/injector/main.cpp)
-    target_include_directories(spyglass_inject PRIVATE src)
-    set_target_properties(spyglass_inject PROPERTIES OUTPUT_NAME spyglass)
+    add_executable(spyglass_injector src/injector/main.cpp)
+    target_include_directories(spyglass_injector PRIVATE src)
+    set_target_properties(spyglass_injector PROPERTIES OUTPUT_NAME spyglass)
 
-    install(TARGETS spyglass_inject RUNTIME DESTINATION .)
+    install(TARGETS spyglass_injector RUNTIME DESTINATION .)
 endif ()

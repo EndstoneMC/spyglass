@@ -50,19 +50,17 @@ hooked function still decodes correctly and only the detour misreads its own arg
 ABI passes both alike, so the Android build stays right while Windows dies on the first packet.
 Spyglass shipped that bug for a week and it read as a client update.
 
-### One dependency manager
+### One dependency source
 
-Conan 2 supplies every third-party dependency on every platform. No `FetchContent`, no
-`ExternalProject`, no vendored copies, no submodules, no per-platform exception. A dependency that
-is awkward to package gets a recipe, not a workaround.
+`third_party/` holds a directory per dependency, each with a `CMakeLists.txt` that fetches it with
+`FetchContent` and defines the target the rest of the build links. No Conan, no `ExternalProject`,
+no vendored copies, no submodules, no system packages, no per-platform exception. A dependency that
+ships no CMake of its own has its build written in its own directory, never inlined into the top
+level.
 
-This includes the mod. Conan cross-builds for Android through the NDK: an `os=Android` profile
-with `tools.android:ndk_path` set makes `CMakeToolchain` include the NDK's own
-`android.toolchain.cmake`, so the `ANDROID` and `ANDROID_ABI` the build gates on come from Conan
-like everything else.
-
-Conan recipes must work for both Windows and Android x86_64. The sibling project endstone consumes
-the same recipes on Windows and Linux, so a recipe is written to build every way, not one way.
+Every dependency is pinned to a tag or a commit, and both platforms take the same revision. imgui
+is pinned to the revision the launcher's own submodule sits on: the two copies share one
+`ImGuiContext`, so a different revision is a different layout.
 
 ### One build description
 
@@ -80,6 +78,10 @@ glob that should not have been written.
 
 There is no Linux target. The Linux launcher runs the Android build of the client under its own
 linker, so the payload it loads is an Android shared object built against bionic, not a Linux one.
+Windows builds through `CMakePresets.json`: `Debug`, `Release` and `RelWithDebInfo`, each
+configuring into `build/<preset>`. The mod has no preset. It configures against the NDK's own
+toolchain file, `$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake`, with `ANDROID_ABI=x86_64`
+and `ANDROID_PLATFORM=android-26`.
 
 ### CI covers every platform
 
