@@ -1,3 +1,5 @@
+#ifdef __ANDROID__
+
 #include "spyglass/overlay/install.h"
 
 #include <cstring>
@@ -6,12 +8,11 @@
 
 #include <imgui.h>
 
-#include "spyglass/core/log.h"
-#include "spyglass/hook/function_hook.h"
-#include "spyglass/hook/host_symbol.h"
+#include "spyglass/hook.h"
+#include "spyglass/overlay/android/host_symbol.h"
 #include "spyglass/overlay/view.h"
 
-namespace spyglass::overlay {
+namespace spyglass {
 namespace {
 
 void (*g_render)() = nullptr;
@@ -19,7 +20,7 @@ View g_view;
 
 void *require(const char *name)
 {
-    void *symbol = hook::host_symbol(name);
+    void *symbol = host_symbol(name);
     if (symbol == nullptr) {
         throw std::runtime_error{std::format("the launcher has no symbol {}, is it stripped?", name)};
     }
@@ -47,7 +48,6 @@ bool adopt_host_context()
     ImGui::SetAllocatorFunctions(alloc, release, user_data);
     ImGui::SetCurrentContext(context);
 
-    log::info("overlay is sharing the launcher's ImGui {}, press F12 for it", host_version);
     return true;
 }
 
@@ -57,8 +57,7 @@ void render()
         try {
             return adopt_host_context();
         }
-        catch (const std::exception &e) {
-            log::error("overlay: {}", e.what());
+        catch (const std::exception &) {
             return false;
         }
     }();
@@ -76,8 +75,10 @@ void render()
 
 void install_overlay()
 {
-    static hook::FunctionHook hook{"ImGui::Render", require("_ZN5ImGui6RenderEv"), reinterpret_cast<void *>(&render),
+    static FunctionHook hook{"ImGui::Render", require("_ZN5ImGui6RenderEv"), reinterpret_cast<void *>(&render),
                                    reinterpret_cast<void **>(&g_render)};
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

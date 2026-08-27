@@ -1,7 +1,7 @@
 #pragma once
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 void install_overlay();
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass

@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef _WIN32
+
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -8,9 +10,9 @@
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 
-#include "spyglass/overlay/backend.h"
+#include "spyglass/overlay/windows/backend.h"
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 // One command allocator per back buffer, reset only when its buffer comes round again.
 class D3D12Backend final : public RenderBackend {
@@ -46,4 +48,6 @@ private:
     std::uint32_t shader_resource_stride_{0};
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 class View {
 public:
@@ -13,4 +13,4 @@ private:
     bool visible_{false};
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass

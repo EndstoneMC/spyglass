@@ -1,17 +1,18 @@
 #pragma once
 
+#ifdef _WIN32
+
 #include <memory>
-#include <string>
 
 #include <d3d12.h>
 #include <dxgi.h>
 
-#include "spyglass/hook/function_hook.h"
-#include "spyglass/overlay/backend.h"
-#include "spyglass/overlay/input.h"
+#include "spyglass/hook.h"
+#include "spyglass/overlay/windows/backend.h"
+#include "spyglass/overlay/windows/input.h"
 #include "spyglass/overlay/view.h"
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 class Overlay {
 public:
@@ -29,9 +30,9 @@ private:
     void create_context();
     void follow_window_dpi();
 
-    hook::FunctionHook present_hook_;
-    hook::FunctionHook resize_hook_;
-    hook::FunctionHook execute_hook_;
+    FunctionHook present_hook_;
+    FunctionHook resize_hook_;
+    FunctionHook execute_hook_;
 
     std::unique_ptr<RenderBackend> backend_;
     InputHook input_;
@@ -40,9 +41,10 @@ private:
     ID3D12CommandQueue *command_queue_{nullptr};
     HWND window_{nullptr};
     float dpi_scale_{0.0F};
-    std::string settings_path_;
     bool context_ready_{false};
     bool unsupported_{false};
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

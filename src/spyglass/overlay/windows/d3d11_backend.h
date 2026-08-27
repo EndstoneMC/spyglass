@@ -1,13 +1,15 @@
 #pragma once
 
+#ifdef _WIN32
+
 #include <memory>
 
 #include <d3d11.h>
 #include <wrl/client.h>
 
-#include "spyglass/overlay/backend.h"
+#include "spyglass/overlay/windows/backend.h"
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 class D3D11Backend final : public RenderBackend {
 public:
@@ -33,4 +35,6 @@ private:
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> render_target_;
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

@@ -5,7 +5,7 @@
 
 using funchook_t = struct funchook;
 
-namespace spyglass::hook {
+namespace spyglass {
 
 class FunctionHook {
 public:
@@ -33,4 +33,4 @@ private:
     funchook_t *funchook_{nullptr};
 };
 
-}  // namespace spyglass::hook
+}  // namespace spyglass

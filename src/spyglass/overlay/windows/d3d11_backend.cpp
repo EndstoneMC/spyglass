@@ -1,13 +1,14 @@
-#include "spyglass/overlay/d3d11_backend.h"
+#ifdef _WIN32
+
+#include "spyglass/overlay/windows/d3d11_backend.h"
 
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
 
-#include "spyglass/core/log.h"
 
 using Microsoft::WRL::ComPtr;
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 std::unique_ptr<D3D11Backend> D3D11Backend::create(IDXGISwapChain *swap_chain)
 {
@@ -26,7 +27,6 @@ std::unique_ptr<D3D11Backend> D3D11Backend::create(IDXGISwapChain *swap_chain)
     if (!ImGui_ImplDX11_Init(backend->device_.Get(), backend->context_.Get())) {
         return nullptr;
     }
-    log::info("overlay backend: Direct3D 11");
     return backend;
 }
 
@@ -69,4 +69,6 @@ void D3D11Backend::release_buffers()
     render_target_.Reset();
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

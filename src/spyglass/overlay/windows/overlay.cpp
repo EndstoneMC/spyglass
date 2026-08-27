@@ -1,4 +1,6 @@
-#include "spyglass/overlay/overlay.h"
+#ifdef _WIN32
+
+#include "spyglass/overlay/windows/overlay.h"
 
 #include <optional>
 #include <stdexcept>
@@ -9,15 +11,13 @@
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 
-#include "spyglass/core/log.h"
 #include "spyglass/overlay/install.h"
-#include "spyglass/core/output.h"
-#include "spyglass/overlay/d3d11_backend.h"
-#include "spyglass/overlay/d3d12_backend.h"
+#include "spyglass/overlay/windows/d3d11_backend.h"
+#include "spyglass/overlay/windows/d3d12_backend.h"
 
 using Microsoft::WRL::ComPtr;
 
-namespace spyglass::overlay {
+namespace spyglass {
 namespace {
 
 constexpr std::size_t kPresentSlot = 8;
@@ -127,12 +127,9 @@ Overlay &Overlay::instance()
 void Overlay::install()
 {
     if (auto *execute = probe_command_queue()) {
-        execute_hook_ = hook::FunctionHook{"ID3D12CommandQueue::ExecuteCommandLists", execute,
+        execute_hook_ = FunctionHook{"ID3D12CommandQueue::ExecuteCommandLists", execute,
                                            reinterpret_cast<void *>(&execute_command_lists_detour),
                                            reinterpret_cast<void **>(&g_execute_command_lists)};
-    }
-    else {
-        log::info("Direct3D 12 is unavailable, the overlay will look for a Direct3D 11 device");
     }
 
     const auto swap_chain = probe_swap_chain();
@@ -140,11 +137,11 @@ void Overlay::install()
         throw std::runtime_error{"could not create a probe swap chain to read the DXGI vtable from"};
     }
 
-    resize_hook_ = hook::FunctionHook{"IDXGISwapChain::ResizeBuffers", swap_chain->second,
+    resize_hook_ = FunctionHook{"IDXGISwapChain::ResizeBuffers", swap_chain->second,
                                       reinterpret_cast<void *>(&resize_buffers_detour),
                                       reinterpret_cast<void **>(&g_resize_buffers)};
     present_hook_ =
-        hook::FunctionHook{"IDXGISwapChain::Present", swap_chain->first, reinterpret_cast<void *>(&present_detour),
+        FunctionHook{"IDXGISwapChain::Present", swap_chain->first, reinterpret_cast<void *>(&present_detour),
                            reinterpret_cast<void **>(&g_present)};
 }
 
@@ -179,8 +176,7 @@ void Overlay::create_context()
 
     auto &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    settings_path_ = (output_directory() / "overlay.ini").string();
-    io.IniFilename = settings_path_.c_str();
+    io.IniFilename = nullptr;
     context_ready_ = true;
 }
 
@@ -231,7 +227,6 @@ bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
         const bool waiting_for_the_command_queue = SUCCEEDED(swap_chain->GetDevice(IID_PPV_ARGS(&device)));
         if (!waiting_for_the_command_queue) {
             unsupported_ = true;
-            log::error("the swap chain is neither Direct3D 11 nor Direct3D 12, the overlay is disabled");
         }
         return false;
     }
@@ -271,4 +266,6 @@ void install_overlay()
     Overlay::instance().install();
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

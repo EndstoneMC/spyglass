@@ -2,7 +2,7 @@
 
 #include <imgui.h>
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 void View::draw()
 {
@@ -14,4 +14,4 @@ void View::draw()
     ImGui::End();
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass

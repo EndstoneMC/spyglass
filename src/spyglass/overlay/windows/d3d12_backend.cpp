@@ -1,15 +1,16 @@
-#include "spyglass/overlay/d3d12_backend.h"
+#ifdef _WIN32
+
+#include "spyglass/overlay/windows/d3d12_backend.h"
 
 #include <algorithm>
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 
-#include "spyglass/core/log.h"
 
 using Microsoft::WRL::ComPtr;
 
-namespace spyglass::overlay {
+namespace spyglass {
 namespace {
 
 constexpr std::uint32_t kShaderResourceDescriptors = 64;
@@ -66,7 +67,6 @@ std::unique_ptr<D3D12Backend> D3D12Backend::create(IDXGISwapChain *swap_chain, I
     if (!backend->initialise(swap_chain, queue)) {
         return nullptr;
     }
-    log::info("overlay backend: Direct3D 12");
     return backend;
 }
 
@@ -214,4 +214,6 @@ void D3D12Backend::release_buffers()
     }
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

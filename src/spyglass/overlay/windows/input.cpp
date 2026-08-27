@@ -1,14 +1,15 @@
-#include "spyglass/overlay/input.h"
+#ifdef _WIN32
+
+#include "spyglass/overlay/windows/input.h"
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 
-#include "spyglass/core/log.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND window, UINT message, WPARAM w_param,
                                                              LPARAM l_param);
 
-namespace spyglass::overlay {
+namespace spyglass {
 namespace {
 
 InputHook *g_hook = nullptr;
@@ -28,11 +29,9 @@ void InputHook::attach(const HWND window, Callbacks callbacks)
     if (original_ == nullptr) {
         window_ = nullptr;
         g_hook = nullptr;
-        log::error("could not subclass the game window, the overlay will not take input");
         return;
     }
     ImGui_ImplWin32_Init(window);
-    log::info("overlay input attached, press INSERT to open");
 }
 
 void InputHook::detach()
@@ -74,4 +73,6 @@ LRESULT InputHook::process(const HWND window, const UINT message, const WPARAM w
     return CallWindowProcW(original_, window, message, w_param, l_param);
 }
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

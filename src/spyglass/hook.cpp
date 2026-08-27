@@ -1,4 +1,4 @@
-#include "spyglass/hook/function_hook.h"
+#include "spyglass/hook.h"
 
 #include <format>
 #include <stdexcept>
@@ -6,9 +6,8 @@
 
 #include <funchook.h>
 
-#include "spyglass/core/log.h"
 
-namespace spyglass::hook {
+namespace spyglass {
 
 FunctionHook::FunctionHook(const std::string_view name, void *target, void *detour, void **original)
 {
@@ -24,7 +23,6 @@ FunctionHook::FunctionHook(const std::string_view name, void *target, void *deto
         reset();
         throw std::runtime_error{std::format("{}: {}", name, message)};
     }
-    log::info("hooked {} at {}", name, target);
 }
 
 FunctionHook::~FunctionHook()
@@ -42,4 +40,4 @@ void FunctionHook::reset() noexcept
     funchook_ = nullptr;
 }
 
-}  // namespace spyglass::hook
+}  // namespace spyglass

@@ -1,4 +1,6 @@
-#include "spyglass/hook/host_symbol.h"
+#ifdef __ANDROID__
+
+#include "spyglass/overlay/android/host_symbol.h"
 
 #include <cstdint>
 #include <cstring>
@@ -9,7 +11,7 @@
 #include <elf.h>
 #include <unistd.h>
 
-namespace spyglass::hook {
+namespace spyglass {
 namespace {
 
 std::string executable_path()
@@ -110,4 +112,6 @@ void *host_symbol(const std::string_view name)
     return nullptr;
 }
 
-}  // namespace spyglass::hook
+}  // namespace spyglass
+
+#endif

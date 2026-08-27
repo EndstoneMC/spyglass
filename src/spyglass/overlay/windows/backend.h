@@ -1,8 +1,10 @@
 #pragma once
 
+#ifdef _WIN32
+
 #include <dxgi.h>
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 class RenderBackend {
 public:
@@ -18,4 +20,6 @@ public:
     virtual void release_buffers() = 0;
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

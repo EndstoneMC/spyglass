@@ -1,10 +1,12 @@
 #pragma once
 
+#ifdef _WIN32
+
 #include <functional>
 
 #include <Windows.h>
 
-namespace spyglass::overlay {
+namespace spyglass {
 
 class InputHook {
 public:
@@ -27,4 +29,6 @@ private:
     Callbacks callbacks_;
 };
 
-}  // namespace spyglass::overlay
+}  // namespace spyglass
+
+#endif

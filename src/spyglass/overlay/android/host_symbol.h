@@ -1,8 +1,10 @@
 #pragma once
 
+#ifdef __ANDROID__
+
 #include <string_view>
 
-namespace spyglass::hook {
+namespace spyglass {
 
 /**
  * Where `name` lives in the launcher executable. The launcher is the process image rather than
@@ -11,4 +13,6 @@ namespace spyglass::hook {
  */
 void *host_symbol(std::string_view name);
 
-}  // namespace spyglass::hook
+}  // namespace spyglass
+
+#endif
