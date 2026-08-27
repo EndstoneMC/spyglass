@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: lukka/get-cmake@latest
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Check the toolchain
+        run: |
+          clang-cl --version
+          ninja --version
+
+      - name: Configure
+        run: cmake --preset release-windows
+
+      - name: Build
+        run: cmake --build --preset release-windows
+
+      - name: Stage
+        run: cmake --install build/release-windows --prefix dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spyglass-windows
+          path: dist/
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: lukka/get-cmake@latest
+
+      - name: Check the toolchain
+        run: |
+          test -d "$ANDROID_NDK_ROOT" || { echo "ANDROID_NDK_ROOT is not set"; exit 1; }
+          "$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" --version
+          ninja --version
+
+      - name: Configure
+        run: cmake --preset release-android
+
+      - name: Build
+        run: cmake --build --preset release-android
+
+      - name: Stage
+        run: cmake --install build/release-android --prefix dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spyglass-android
+          path: dist/
