@@ -107,8 +107,13 @@ int relaunch_elevated()
 }
 
 struct ConsoleHold {
+    bool succeeded{false};
+
     ~ConsoleHold()
     {
+        if (succeeded) {
+            return;
+        }
         DWORD owners[2]{};
         const bool console_dies_with_this_process = GetConsoleProcessList(owners, 2) == 1;
         if (!console_dies_with_this_process) {
@@ -277,7 +282,7 @@ int wmain(const int argc, wchar_t **argv)
         return relaunch_elevated();
     }
 
-    const ConsoleHold hold;
+    ConsoleHold hold;
 
     if (payload.empty()) {
         std::wstring self(MAX_PATH, L'\0');
@@ -310,5 +315,6 @@ int wmain(const int argc, wchar_t **argv)
     }
 
     std::wprintf(L"injected %s into %s (pid %lu)\n", payload.filename().c_str(), process_name.c_str(), *pid);
+    hold.succeeded = true;
     return 0;
 }
