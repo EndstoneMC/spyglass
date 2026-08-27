@@ -47,8 +47,8 @@ the other way round, so the swap hands the detour its return buffer where it exp
 
 Nothing about this fails loudly. The forwarding call passes the registers straight through, so the
 hooked function still decodes correctly and only the detour misreads its own arguments; the Itanium
-ABI passes both alike, so Linux stays right while Windows dies on the first packet. Spyglass shipped
-that bug for a week and it read as a client update.
+ABI passes both alike, so the Android build stays right while Windows dies on the first packet.
+Spyglass shipped that bug for a week and it read as a client update.
 
 ### One dependency manager
 
@@ -56,8 +56,13 @@ Conan 2 supplies every third-party dependency on every platform. No `FetchConten
 `ExternalProject`, no vendored copies, no submodules, no per-platform exception. A dependency that
 is awkward to package gets a recipe, not a workaround.
 
-Conan recipes must work on both Windows and Linux. The sibling project endstone consumes the same
-recipes on both, so a recipe that only builds one way is broken.
+This includes the mod. Conan cross-builds for Android through the NDK: an `os=Android` profile
+with `tools.android:ndk_path` set makes `CMakeToolchain` include the NDK's own
+`android.toolchain.cmake`, so the `ANDROID` and `ANDROID_ABI` the build gates on come from Conan
+like everything else.
+
+Conan recipes must work for both Windows and Android x86_64. The sibling project endstone consumes
+the same recipes on Windows and Linux, so a recipe is written to build every way, not one way.
 
 ### One build description
 
@@ -70,14 +75,17 @@ glob that should not have been written.
 
 | target | toolchain |
 | --- | --- |
-| Windows | clang-cl, MSVC's Windows SDK and STL |
-| Linux | clang with libc++ |
+| Windows DLL and injector | clang-cl, MSVC's Windows SDK and STL |
 | Launcher mod | Android NDK (clang, libc++), x86_64 |
+
+There is no Linux target. The Linux launcher runs the Android build of the client under its own
+linker, so the payload it loads is an Android shared object built against bionic, not a Linux one.
 
 ### CI covers every platform
 
 Every platform that ships is built in CI. A target nobody builds is a target that is already
-broken. Release artifacts are the injector and the DLL for Windows, and the launcher mod for Linux.
+broken. Release artifacts are the injector and the DLL for Windows, and the Android mod the Linux
+launcher loads.
 
 ### Prose
 
