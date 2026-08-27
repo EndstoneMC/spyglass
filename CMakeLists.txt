@@ -18,6 +18,12 @@ add_library(spyglass SHARED
         src/spyglass/main.cpp
         src/spyglass/overlay/android/overlay.cpp
         src/spyglass/overlay/android/symbol.cpp
+        src/spyglass/overlay/capture.cpp
+        src/spyglass/overlay/pane/packet_bytes.cpp
+        src/spyglass/overlay/pane/packet_details.cpp
+        src/spyglass/overlay/pane/packet_list.cpp
+        src/spyglass/overlay/pane/status_bar.cpp
+        src/spyglass/overlay/pane/toolbar.cpp
         src/spyglass/overlay/view.cpp
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp
