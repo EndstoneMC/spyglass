@@ -14,8 +14,8 @@ public:
 private:
     Capture capture_;
     bool visible_{true};
-    float list_height_{0.0F};
-    float details_height_{0.0F};
+    float list_share_{0.45F};
+    float details_share_{0.30F};
 };
 
 }  // namespace spyglass
