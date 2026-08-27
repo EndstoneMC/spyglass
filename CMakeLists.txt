@@ -40,7 +40,8 @@ if (WIN32)
     install(FILES $<TARGET_PDB_FILE:spyglass> DESTINATION . OPTIONAL)
 
     add_executable(spyglass_injector src/injector/main.cpp)
-    target_include_directories(spyglass_injector PRIVATE src)
+    target_link_libraries(spyglass_injector PRIVATE advapi32 shell32)
+    target_link_options(spyglass_injector PRIVATE /DEBUG:NONE)
     set_target_properties(spyglass_injector PROPERTIES OUTPUT_NAME spyglass)
 
     install(TARGETS spyglass_injector RUNTIME DESTINATION .)
