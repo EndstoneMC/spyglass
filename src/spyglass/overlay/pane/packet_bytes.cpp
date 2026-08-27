@@ -18,10 +18,22 @@ constexpr std::size_t kBytesPerRow = 16;
 void draw_packet_bytes(const Capture &capture, const float height)
 {
     constexpr auto flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-    const auto body = capture.selected_body();
+    constexpr int columns = 3 + (2 * static_cast<int>(kBytesPerRow));
 
-    if (!ImGui::BeginTable("bytes", 1 + (2 * kBytesPerRow), flags, ImVec2{-1.0F, height})) {
+    const auto body = capture.selected_body();
+    if (!ImGui::BeginTable("bytes", columns, flags, ImVec2{-1.0F, height})) {
         return;
+    }
+
+    const float gap = ImGui::GetStyle().ItemSpacing.x;
+    ImGui::TableSetupColumn("offset", ImGuiTableColumnFlags_WidthFixed);
+    ImGui::TableSetupColumn("before hex", ImGuiTableColumnFlags_WidthFixed, gap);
+    for (std::size_t i = 0; i < kBytesPerRow; ++i) {
+        ImGui::TableSetupColumn("hex", ImGuiTableColumnFlags_WidthFixed);
+    }
+    ImGui::TableSetupColumn("before text", ImGuiTableColumnFlags_WidthFixed, gap);
+    for (std::size_t i = 0; i < kBytesPerRow; ++i) {
+        ImGui::TableSetupColumn("text", ImGuiTableColumnFlags_WidthFixed);
     }
 
     for (std::size_t offset = 0; offset < body.size(); offset += kBytesPerRow) {
@@ -31,6 +43,7 @@ void draw_packet_bytes(const Capture &capture, const float height)
         ImGui::TableNextColumn();
         ImGui::TextColored(kMuted, "%04X", static_cast<unsigned>(offset));
 
+        ImGui::TableNextColumn();
         for (std::size_t i = 0; i < kBytesPerRow; ++i) {
             ImGui::TableNextColumn();
             if (i < row) {
@@ -38,6 +51,7 @@ void draw_packet_bytes(const Capture &capture, const float height)
             }
         }
 
+        ImGui::TableNextColumn();
         for (std::size_t i = 0; i < kBytesPerRow; ++i) {
             ImGui::TableNextColumn();
             if (i < row) {
