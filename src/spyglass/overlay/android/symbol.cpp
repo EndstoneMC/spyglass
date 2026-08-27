@@ -1,6 +1,6 @@
 #ifdef __ANDROID__
 
-#include "spyglass/overlay/android/host_symbol.h"
+#include "spyglass/overlay/android/symbol.h"
 
 #include <cstdint>
 #include <cstring>

@@ -9,7 +9,7 @@
 #include <imgui.h>
 
 #include "spyglass/hook.h"
-#include "spyglass/overlay/android/host_symbol.h"
+#include "spyglass/overlay/android/symbol.h"
 #include "spyglass/overlay/view.h"
 
 namespace spyglass {

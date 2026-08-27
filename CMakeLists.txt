@@ -16,8 +16,8 @@ add_subdirectory(third_party)
 add_library(spyglass SHARED
         src/spyglass/hook.cpp
         src/spyglass/main.cpp
-        src/spyglass/overlay/android/host_symbol.cpp
         src/spyglass/overlay/android/overlay.cpp
+        src/spyglass/overlay/android/symbol.cpp
         src/spyglass/overlay/view.cpp
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp
