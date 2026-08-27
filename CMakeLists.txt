@@ -13,7 +13,27 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(third_party)
 
-add_library(spyglass SHARED src/spyglass/main.cpp)
+set(SPYGLASS_SOURCES
+        src/spyglass/core/log.cpp
+        src/spyglass/core/output.cpp
+        src/spyglass/core/time.cpp
+        src/spyglass/hook/function_hook.cpp
+        src/spyglass/main.cpp
+        src/spyglass/overlay/view.cpp)
+
+if (WIN32)
+    list(APPEND SPYGLASS_SOURCES
+            src/spyglass/overlay/d3d11_backend.cpp
+            src/spyglass/overlay/d3d12_backend.cpp
+            src/spyglass/overlay/input.cpp
+            src/spyglass/overlay/overlay.cpp)
+else ()
+    list(APPEND SPYGLASS_SOURCES
+            src/spyglass/hook/host_symbol.cpp
+            src/spyglass/overlay/launcher_overlay.cpp)
+endif ()
+
+add_library(spyglass SHARED ${SPYGLASS_SOURCES})
 target_include_directories(spyglass PRIVATE src)
 target_link_libraries(spyglass PRIVATE
         nonstd::expected-lite

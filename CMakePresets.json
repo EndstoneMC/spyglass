@@ -42,13 +42,6 @@
       }
     },
     {
-      "name": "debug-windows",
-      "inherits": "windows",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
       "name": "release-windows",
       "inherits": "windows",
       "cacheVariables": {
@@ -85,10 +78,6 @@
     }
   ],
   "buildPresets": [
-    {
-      "name": "debug-windows",
-      "configurePreset": "debug-windows"
-    },
     {
       "name": "release-windows",
       "configurePreset": "release-windows"

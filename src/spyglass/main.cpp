@@ -2,9 +2,27 @@
 #include <Windows.h>
 #endif
 
+#include <exception>
+
+#include "spyglass/core/log.h"
+#include "spyglass/core/output.h"
+#include "spyglass/overlay/install.h"
+
 namespace {
 
-void start() {}
+void start()
+{
+    spyglass::log::info("spyglass attached, writing to {}", spyglass::output_directory().string());
+    try {
+        spyglass::overlay::install_overlay();
+    }
+    catch (const std::exception &e) {
+        spyglass::log::error("overlay: {}", e.what());
+    }
+    catch (...) {
+        spyglass::log::error("overlay: unknown error");
+    }
+}
 
 }  // namespace
 
