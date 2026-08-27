@@ -78,10 +78,10 @@ glob that should not have been written.
 
 There is no Linux target. The Linux launcher runs the Android build of the client under its own
 linker, so the payload it loads is an Android shared object built against bionic, not a Linux one.
-Windows builds through `CMakePresets.json`: `Debug`, `Release` and `RelWithDebInfo`, each
-configuring into `build/<preset>`. The mod has no preset. It configures against the NDK's own
-toolchain file, `$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake`, with `ANDROID_ABI=x86_64`
-and `ANDROID_PLATFORM=android-26`.
+Both platforms build through `CMakePresets.json`, as `debug-windows` and `debug-android` and the
+same for `release` and `relwithdebinfo`, each configuring into `build/<preset>`. The Android presets
+take the NDK from `ANDROID_NDK_ROOT` and hide themselves when it is unset. The Windows presets hide
+themselves off a Windows host.
 
 ### CI covers every platform
 

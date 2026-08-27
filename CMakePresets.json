@@ -19,25 +19,66 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
-      "name": "Debug",
+      "name": "android",
+      "hidden": true,
+      "inherits": "base",
+      "toolchainFile": "$env{ANDROID_NDK_ROOT}/build/cmake/android.toolchain.cmake",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86_64",
+        "ANDROID_PLATFORM": "android-26"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "$env{ANDROID_NDK_ROOT}",
+        "rhs": ""
+      }
+    },
+    {
+      "name": "debug-windows",
       "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
-      "name": "Release",
+      "name": "release-windows",
       "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "RelWithDebInfo",
+      "name": "relwithdebinfo-windows",
       "inherits": "windows",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "debug-android",
+      "inherits": "android",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release-android",
+      "inherits": "android",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "relwithdebinfo-android",
+      "inherits": "android",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -45,16 +86,28 @@
   ],
   "buildPresets": [
     {
-      "name": "Debug",
-      "configurePreset": "Debug"
+      "name": "debug-windows",
+      "configurePreset": "debug-windows"
     },
     {
-      "name": "Release",
-      "configurePreset": "Release"
+      "name": "release-windows",
+      "configurePreset": "release-windows"
     },
     {
-      "name": "RelWithDebInfo",
-      "configurePreset": "RelWithDebInfo"
+      "name": "relwithdebinfo-windows",
+      "configurePreset": "relwithdebinfo-windows"
+    },
+    {
+      "name": "debug-android",
+      "configurePreset": "debug-android"
+    },
+    {
+      "name": "release-android",
+      "configurePreset": "release-android"
+    },
+    {
+      "name": "relwithdebinfo-android",
+      "configurePreset": "relwithdebinfo-android"
     }
   ]
 }
