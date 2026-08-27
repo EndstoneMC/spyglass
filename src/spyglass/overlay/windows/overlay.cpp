@@ -2,8 +2,10 @@
 
 #include "spyglass/overlay/windows/overlay.h"
 
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 #include <d3d11.h>
 #include <wrl/client.h>
@@ -177,6 +179,19 @@ void Overlay::create_context()
     auto &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = nullptr;
+
+    std::wstring executable(MAX_PATH, L'\0');
+    executable.resize(GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size())));
+    const auto mojangles =
+        std::filesystem::path{executable}.parent_path() / "data" / "fonts" / "Mojangles.ttf";
+
+    ImFontConfig font;
+    font.Flags |= ImFontFlags_NoLoadError;
+    font.OversampleH = 1;
+    font.OversampleV = 1;
+    font.PixelSnapH = true;
+    io.Fonts->AddFontFromFileTTF(mojangles.string().c_str(), 16.0F, &font);
+
     context_ready_ = true;
 }
 
