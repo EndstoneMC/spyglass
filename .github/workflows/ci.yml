@@ -26,13 +26,13 @@ jobs:
           ninja --version
 
       - name: Configure
-        run: cmake --preset release-windows
+        run: cmake --preset relwithdebinfo-windows
 
       - name: Build
-        run: cmake --build --preset release-windows
+        run: cmake --build --preset relwithdebinfo-windows
 
       - name: Stage
-        run: cmake --install build/release-windows --prefix dist
+        run: cmake --install build/relwithdebinfo-windows --prefix dist
 
       - uses: actions/upload-artifact@v4
         with:
@@ -53,13 +53,13 @@ jobs:
           ninja --version
 
       - name: Configure
-        run: cmake --preset release-android
+        run: cmake --preset relwithdebinfo-android
 
       - name: Build
-        run: cmake --build --preset release-android
+        run: cmake --build --preset relwithdebinfo-android
 
       - name: Stage
-        run: cmake --install build/release-android --prefix dist
+        run: cmake --install build/relwithdebinfo-android --prefix dist
 
       - uses: actions/upload-artifact@v4
         with:

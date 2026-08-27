@@ -5,6 +5,7 @@ FetchContent_Declare(funchook
         GIT_REPOSITORY https://github.com/kubo/funchook.git
         GIT_TAG v1.1.3
         GIT_SHALLOW TRUE
-        GIT_SUBMODULES_RECURSE TRUE)
+        GIT_SUBMODULES_RECURSE TRUE
+        EXCLUDE_FROM_ALL)
 
 FetchContent_MakeAvailable(funchook)

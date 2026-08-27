@@ -1,6 +1,7 @@
 FetchContent_Declare(imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG a0bfbe4d8f6ddf7f678e6aeac7b1253fe2fc9cda)
+        GIT_TAG a0bfbe4d8f6ddf7f678e6aeac7b1253fe2fc9cda
+        EXCLUDE_FROM_ALL)
 
 FetchContent_MakeAvailable(imgui)
 

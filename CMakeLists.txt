@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.28)
 project(spyglass VERSION 0.1.0 LANGUAGES CXX)
 
 if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -28,6 +28,8 @@ endif ()
 install(TARGETS spyglass RUNTIME DESTINATION . LIBRARY DESTINATION .)
 
 if (WIN32)
+    install(FILES $<TARGET_PDB_FILE:spyglass> DESTINATION . OPTIONAL)
+
     add_executable(spyglass_injector src/injector/main.cpp)
     target_include_directories(spyglass_injector PRIVATE src)
     set_target_properties(spyglass_injector PROPERTIES OUTPUT_NAME spyglass)
