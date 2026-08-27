@@ -10,7 +10,12 @@
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "inherits": "base",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang-cl",
         "CMAKE_CXX_COMPILER": "clang-cl"
@@ -18,21 +23,21 @@
     },
     {
       "name": "Debug",
-      "inherits": "base",
+      "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "Release",
-      "inherits": "base",
+      "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
       "name": "RelWithDebInfo",
-      "inherits": "base",
+      "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
