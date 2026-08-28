@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 
+#include "spyglass/overlay/pane/filter_window.h"
 #include "spyglass/overlay/pane/packet_bytes.h"
 #include "spyglass/overlay/pane/packet_details.h"
 #include "spyglass/overlay/pane/packet_list.h"
@@ -68,9 +69,13 @@ void View::draw()
         ImGui::End();
     }
 
+    if (filter_open_ && interactive_) {
+        draw_filter_window(capture_, filter_, filter_window_, filter_open_);
+    }
+
     ImGui::SetNextWindowSize(ImVec2{960.0F, 720.0F}, ImGuiCond_FirstUseEver);
     if (ImGui::Begin("spyglass", &visible_, ImGuiWindowFlags_NoScrollbar)) {
-        draw_toolbar(capture_);
+        draw_toolbar(capture_, filter_, filter_open_);
         ImGui::Separator();
 
         const float footer = (2.0F * ImGui::GetStyle().ItemSpacing.y) + ImGui::GetTextLineHeight();
@@ -83,17 +88,17 @@ void View::draw()
                                ((pane_count + splitter_count - 1.0F) * ImGui::GetStyle().ItemSpacing.y));
         const float smallest = std::min(kPreferredMinimum, usable / pane_count);
 
-        const float list = std::clamp(usable * list_share_, smallest, usable - (splitter_count * smallest));
+        const float list_height = std::clamp(usable * list_share_, smallest, usable - (splitter_count * smallest));
         if (usable > 0.0F) {
-            list_share_ = list / usable;
+            list_share_ = list_height / usable;
         }
 
-        draw_packet_list(capture_, list_scroll_, list);
+        draw_packet_list(capture_, filter_, list_, list_height);
         splitter("list_splitter", list_share_, usable);
 
-        float taken = list;
+        float taken = list_height;
         if (kDetailsPane) {
-            const float details = std::clamp(usable * details_share_, smallest, usable - list - smallest);
+            const float details = std::clamp(usable * details_share_, smallest, usable - list_height - smallest);
             if (usable > 0.0F) {
                 details_share_ = details / usable;
             }
@@ -107,7 +112,7 @@ void View::draw()
         ImGui::EndChild();
 
         ImGui::Separator();
-        draw_status_bar(capture_, bytes_view_);
+        draw_status_bar(capture_, list_, bytes_view_);
     }
     ImGui::End();
 }

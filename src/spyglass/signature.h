@@ -78,6 +78,7 @@ struct Signatures {
     std::string_view batched_send_packet;
     std::string_view packet_read_no_header;
     std::string_view create_packet;
+    int max_packet_id;
 };
 
 const Signatures &signatures();
@@ -91,6 +92,7 @@ constexpr Signatures kReleaseClient{
                              "C7 85 88 00 00 00 FE FF FF FF 48 89 D6 48 8B 85 F0 00",
     .create_packet = "56 48 83 EC 20 48 89 CE 81 FA 5F 01 00 00 77 ? 89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 C8 FF E0 "
                      "0F 57 C0 0F 11 06 48 89 F0 48 83 C4 20 5E",
+    .max_packet_id = 0x15f,
 };
 
 constexpr Signatures kPreviewClient{
@@ -100,6 +102,7 @@ constexpr Signatures kPreviewClient{
                              "C7 85 88 00 00 00 FE FF FF FF 48 89 D6 48 8B 85 F0 00",
     .create_packet = "56 48 83 EC 30 48 89 CE 81 FA 61 01 00 00 0F 87 ? ? ? ? 89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 "
                      "C8 FF E0 0F 57 C0 0F 11 06 48 89 F0 48 83 C4 30 5E",
+    .max_packet_id = 0x161,
 };
 
 constexpr std::string_view kMouseFeed =
@@ -117,6 +120,7 @@ constexpr Signatures kAndroidClient{
                              "88 45 D0 84 C0 74 07",
     .create_packet = "55 48 89 E5 53 50 48 89 FB 81 FE 5F 01 00 00 77 12 89 F0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 C8 "
                      "FF E0 0F 57 C0 0F 11 03",
+    .max_packet_id = 0x15f,
 };
 
 #endif

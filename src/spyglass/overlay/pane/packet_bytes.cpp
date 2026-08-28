@@ -225,7 +225,7 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
     bool open_text = false;
 
     ImGui::SameLine();
-    if (focused && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F)) {
+    if (focused && !ImGui::GetIO().WantTextInput && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F)) {
         ImGui::SetKeyboardFocusHere();
     }
     ImGui::SetNextItemWidth(180.0F);

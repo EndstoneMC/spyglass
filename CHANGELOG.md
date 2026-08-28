@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A filter for the packet list, opened with `Filter` on the toolbar. It lists every packet the client
+  knows, by id, each with a tick box and the number of them seen so far. Untick the ones you do not
+  want in the list. The find box narrows what the window itself shows, and `All`, `None` and `Invert`
+  act on that, so typing `chunk` and pressing `None` hides every chunk packet at once. `Failed decodes
+  only` and the two direction boxes cut the list down further.
+- Right-clicking a packet in the list hides that packet, shows only it, or copies the row.
+- The status bar says how many packets are being shown while a filter is on, and the toolbar button
+  carries a mark so a filtered list is never mistaken for a stalled capture.
+
+### Fixed
+
+- Keyboard navigation could move focus onto `Restart` and wipe the capture. The capture buttons no
+  longer take focus.
+
 ## [0.2.0] - 2026-08-28
 
 ### Added

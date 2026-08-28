@@ -23,6 +23,8 @@ add_library(spyglass SHARED
         src/spyglass/overlay/android/overlay.cpp
         src/spyglass/overlay/android/symbol.cpp
         src/spyglass/overlay/capture.cpp
+        src/spyglass/overlay/filter.cpp
+        src/spyglass/overlay/pane/filter_window.cpp
         src/spyglass/overlay/pane/packet_bytes.cpp
         src/spyglass/overlay/pane/packet_details.cpp
         src/spyglass/overlay/pane/packet_list.cpp

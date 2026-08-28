@@ -42,6 +42,14 @@ half, search the body for hex or text with `F3` and `Ctrl+F`, and copy what you 
 stream, printable text, a C array or base64. `Show text...` puts the same output in a box to read instead of on the
 clipboard.
 
+**The filter** window, opened with `Filter` on the toolbar, decides what the list shows. It holds every packet the
+client knows, by id, each with a tick box and the number of them the session has seen. Untick what you do not want.
+The find box narrows the window's own list, and `All`, `None` and `Invert` act on what it is showing, so typing
+`chunk` and pressing `None` hides every chunk packet in one go. `Failed decodes only` and the two direction boxes
+cut the list down further, and right-clicking a packet in the capture hides it or shows only it. The button carries
+a mark while a filter is on, and the status bar says how many packets are being shown, so a filtered list is never
+mistaken for a stalled capture.
+
 `Start`, `Stop` and `Restart` control the capture. The status bar carries the totals, the share that failed, and the
 extent of the selection.
 

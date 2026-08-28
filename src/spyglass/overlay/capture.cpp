@@ -32,6 +32,13 @@ void Capture::record(Record record)
     if (!record.decoded) {
         ++bad_;
     }
+    if (record.id >= 0) {
+        const auto id = static_cast<std::size_t>(record.id);
+        if (id >= counts_.size()) {
+            counts_.resize(id + 1, 0);
+        }
+        ++counts_[id];
+    }
     bytes_ += record.body ? record.body->size() : 0;
     records_.push_back(std::move(record));
 
@@ -41,28 +48,13 @@ void Capture::record(Record record)
     }
 }
 
-std::size_t Capture::size() const
-{
-    const std::lock_guard lock{mutex_};
-    return records_.size();
-}
-
 std::uint64_t Capture::total() const
 {
     const std::lock_guard lock{mutex_};
     return counter_;
 }
 
-Record Capture::at(const std::size_t index) const
-{
-    const std::lock_guard lock{mutex_};
-    if (index >= records_.size()) {
-        return {};
-    }
-    return records_[index];
-}
-
-const Record *Capture::at_number(const std::uint64_t number) const
+const Record *Capture::find(const std::uint64_t number) const
 {
     if (records_.empty() || number < records_.front().number) {
         return nullptr;
@@ -74,25 +66,34 @@ const Record *Capture::at_number(const std::uint64_t number) const
     return &records_[static_cast<std::size_t>(index)];
 }
 
+Record Capture::at_number(const std::uint64_t number) const
+{
+    const std::lock_guard lock{mutex_};
+    if (const auto *record = find(number)) {
+        return *record;
+    }
+    return {};
+}
+
 std::optional<Record> Capture::selected_record() const
 {
     const std::lock_guard lock{mutex_};
-    if (const auto *record = at_number(selected_)) {
+    if (const auto *record = find(selected_)) {
         return *record;
     }
     return std::nullopt;
-}
-
-std::uint64_t Capture::oldest() const
-{
-    const std::lock_guard lock{mutex_};
-    return records_.empty() ? 0 : records_.front().number;
 }
 
 std::uint64_t Capture::bad() const
 {
     const std::lock_guard lock{mutex_};
     return bad_;
+}
+
+std::vector<std::uint64_t> Capture::counts() const
+{
+    const std::lock_guard lock{mutex_};
+    return counts_;
 }
 
 std::uint64_t Capture::selected() const
@@ -129,6 +130,7 @@ void Capture::restart()
 {
     const std::lock_guard lock{mutex_};
     records_.clear();
+    counts_.clear();
     counter_ = 0;
     bad_ = 0;
     bytes_ = 0;

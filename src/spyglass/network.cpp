@@ -2,14 +2,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "bedrock/core/utility/binary_stream.h"
@@ -40,22 +39,11 @@ spyglass::Body body_of(const std::string_view data)
 
 std::string name_of(const int id)
 {
-    static std::mutex mutex;
-    static std::unordered_map<int, std::string> names;
-
-    const std::lock_guard lock{mutex};
-    if (const auto cached = names.find(id); cached != names.end()) {
-        return cached->second;
+    const auto &names = spyglass::packet_names();
+    if (id < 0 || static_cast<std::size_t>(id) >= names.size()) {
+        return {};
     }
-
-    std::string name;
-    if (g_create_packet != nullptr && id >= 0) {
-        const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
-        if (const auto packet = create(static_cast<MinecraftPacketIds>(id))) {
-            name = packet->getName();
-        }
-    }
-    return names.emplace(id, std::move(name)).first->second;
+    return names[static_cast<std::size_t>(id)];
 }
 
 spyglass::Node node_of(const Bedrock::ErrorInfo<std::error_code> &info)
@@ -154,6 +142,24 @@ void install_network_hook()
                              detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
     static FunctionHook read{"Packet::readNoHeader", find(signature.packet_read_no_header),
                              detail::fp_cast(&Packet::readNoHeader), &g_read_no_header};
+}
+
+const std::vector<std::string> &packet_names()
+{
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> table(static_cast<std::size_t>(signatures().max_packet_id) + 1);
+        if (g_create_packet == nullptr) {
+            return table;
+        }
+        const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
+        for (std::size_t id = 1; id < table.size(); ++id) {
+            if (const auto packet = create(static_cast<MinecraftPacketIds>(id))) {
+                table[id] = packet->getName();
+            }
+        }
+        return table;
+    }();
+    return names;
 }
 
 }  // namespace spyglass

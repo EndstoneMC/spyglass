@@ -276,6 +276,7 @@ void Overlay::present(IDXGISwapChain *swap_chain)
         GetCursorInfo(&cursor) != 0 && (cursor.flags & CURSOR_SHOWING) != 0 && cursor.hCursor != nullptr;
     ImGui::GetIO().MouseDrawCursor = !os_cursor_visible;
     input_.set_cursor_free(os_cursor_visible);
+    View::getInstance().set_interactive(os_cursor_visible);
 
     backend_->new_frame();
     ImGui_ImplWin32_NewFrame();
