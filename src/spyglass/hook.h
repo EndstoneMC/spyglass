@@ -1,7 +1,10 @@
 #pragma once
 
+#include <functional>
 #include <string_view>
 #include <utility>
+
+#include "spyglass/detail.h"
 
 using funchook_t = struct funchook;
 
@@ -34,3 +37,7 @@ private:
 };
 
 }  // namespace spyglass
+
+#define SPYGLASS_CALL_ORIGINAL(fp, original, ...) std::invoke(spyglass::detail::fp_cast(fp, original), ##__VA_ARGS__)
+
+#define SPYGLASS_CALL_ORIGINAL_CTOR(original, ...) spyglass::detail::ctor_cast<__VA_ARGS__>(original)

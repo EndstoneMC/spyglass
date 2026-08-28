@@ -2,20 +2,7 @@
 #include <Windows.h>
 #endif
 
-#include "spyglass/overlay/install.h"
-
-namespace {
-
-void start()
-{
-    try {
-        spyglass::install_overlay();
-    }
-    catch (...) {
-    }
-}
-
-}  // namespace
+#include "spyglass/install.h"
 
 #ifdef _WIN32
 
@@ -24,7 +11,7 @@ BOOL WINAPI DllMain(const HINSTANCE module, const DWORD reason, LPVOID /*reserve
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(module);
         CloseHandle(CreateThread(
-            nullptr, 0, [](LPVOID) -> DWORD { start(); return 0; }, nullptr, 0, nullptr));
+            nullptr, 0, [](LPVOID) -> DWORD { spyglass::install(); return 0; }, nullptr, 0, nullptr));
     }
     return TRUE;
 }
@@ -33,7 +20,7 @@ BOOL WINAPI DllMain(const HINSTANCE module, const DWORD reason, LPVOID /*reserve
 
 extern "C" void mod_init()
 {
-    start();
+    spyglass::install();
 }
 
 #endif

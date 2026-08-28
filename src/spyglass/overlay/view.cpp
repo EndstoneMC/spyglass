@@ -9,6 +9,8 @@
 #include "spyglass/overlay/pane/packet_list.h"
 #include "spyglass/overlay/pane/status_bar.h"
 #include "spyglass/overlay/pane/toolbar.h"
+#include "spyglass/overlay/theme.h"
+#include "spyglass/error.h"
 
 namespace spyglass {
 namespace {
@@ -32,8 +34,34 @@ void splitter(const char *id, float &share, const float usable)
 
 }  // namespace
 
+View &View::getInstance()
+{
+    static View view;
+    return view;
+}
+
+void View::onPacketSend(const std::string_view data)
+{
+    capture_.record(Direction::Outbound, data);
+}
+
+void View::onPacketReceive(const std::string_view data)
+{
+    capture_.record(Direction::Inbound, data);
+}
+
 void View::draw()
 {
+    if (const auto failures = errors(); !failures.empty() && errors_open_) {
+        ImGui::SetNextWindowSize(ImVec2{520.0F, 0.0F}, ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("spyglass: errors", &errors_open_)) {
+            for (const auto &message : failures) {
+                ImGui::TextColored(kBadPacket, "%s", message.c_str());
+            }
+        }
+        ImGui::End();
+    }
+
     if (!visible_) {
         return;
     }

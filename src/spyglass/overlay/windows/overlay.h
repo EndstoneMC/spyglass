@@ -36,7 +36,6 @@ private:
 
     std::unique_ptr<RenderBackend> backend_;
     InputHook input_;
-    View view_;
 
     ID3D12CommandQueue *command_queue_{nullptr};
     HWND window_{nullptr};

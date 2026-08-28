@@ -14,8 +14,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_subdirectory(third_party)
 
 add_library(spyglass SHARED
+        src/spyglass/error.cpp
         src/spyglass/hook.cpp
+        src/spyglass/install.cpp
         src/spyglass/main.cpp
+        src/spyglass/network.cpp
         src/spyglass/overlay/android/overlay.cpp
         src/spyglass/overlay/android/symbol.cpp
         src/spyglass/overlay/capture.cpp
@@ -28,7 +31,8 @@ add_library(spyglass SHARED
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp
         src/spyglass/overlay/windows/input.cpp
-        src/spyglass/overlay/windows/overlay.cpp)
+        src/spyglass/overlay/windows/overlay.cpp
+        src/spyglass/pattern.cpp)
 target_include_directories(spyglass PRIVATE src)
 target_link_libraries(spyglass PRIVATE
         nonstd::expected-lite

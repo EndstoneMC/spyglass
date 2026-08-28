@@ -229,8 +229,8 @@ bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
         create_context();
     }
     input_.attach(desc.OutputWindow, {
-                                         .visible = [this] { return view_.visible(); },
-                                         .toggle = [this] { view_.toggle(); },
+                                         .visible = [this] { return View::getInstance().visible(); },
+                                         .toggle = [this] { View::getInstance().toggle(); },
                                      });
 
     backend_ = D3D12Backend::create(swap_chain, command_queue_);
@@ -264,7 +264,7 @@ void Overlay::present(IDXGISwapChain *swap_chain)
     backend_->new_frame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    view_.draw();
+    View::getInstance().draw();
     ImGui::Render();
     backend_->render(swap_chain);
 }

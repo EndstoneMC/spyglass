@@ -41,7 +41,7 @@ void draw_packet_list(Capture &capture, const float height)
 
         ImGui::TableNextColumn();
         char number[16];
-        std::snprintf(number, sizeof(number), "%d", packet.number);
+        std::snprintf(number, sizeof(number), "%llu", static_cast<unsigned long long>(packet.number));
         if (ImGui::Selectable(number, capture.selected() == index, ImGuiSelectableFlags_SpanAllColumns)) {
             capture.select(index);
         }
@@ -53,7 +53,7 @@ void draw_packet_list(Capture &capture, const float height)
         ImGui::TableNextColumn();
         text(packet.destination);
         ImGui::TableNextColumn();
-        ImGui::Text("%d", packet.length);
+        ImGui::Text("%u", packet.length);
 
         ImGui::TableNextColumn();
         ImGui::PushStyleColor(ImGuiCol_Text, packet.bad ? kBadPacket : ImGui::GetStyleColorVec4(ImGuiCol_Text));

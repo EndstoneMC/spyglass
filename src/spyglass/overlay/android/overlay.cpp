@@ -16,7 +16,6 @@ namespace spyglass {
 namespace {
 
 void (*g_render)() = nullptr;
-View g_view;
 
 void *require(const char *name)
 {
@@ -64,9 +63,9 @@ void render()
 
     if (ready) {
         if (ImGui::IsKeyPressed(ImGuiKey_F12, false)) {
-            g_view.toggle();
+            View::getInstance().toggle();
         }
-        g_view.draw();
+        View::getInstance().draw();
     }
     g_render();
 }
