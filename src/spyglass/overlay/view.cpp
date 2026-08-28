@@ -86,7 +86,7 @@ void View::draw()
             list_share_ = list / usable;
         }
 
-        draw_packet_list(capture_, list);
+        draw_packet_list(capture_, list_scroll_, list);
         splitter("list_splitter", list_share_, usable);
 
         float taken = list;

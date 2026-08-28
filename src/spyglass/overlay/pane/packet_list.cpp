@@ -19,12 +19,21 @@ void text(const std::string_view value)
 
 }  // namespace
 
-void draw_packet_list(Capture &capture, const float height)
+void draw_packet_list(Capture &capture, ListScroll &scroll, const float height)
 {
     constexpr auto flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                            ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
     if (!ImGui::BeginTable("packets", 7, flags, ImVec2{-1.0F, height})) {
         return;
+    }
+
+    scroll.follow = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - ImGui::GetTextLineHeightWithSpacing();
+
+    const auto oldest = capture.oldest();
+    const auto evicted = oldest > scroll.oldest ? oldest - scroll.oldest : 0;
+    scroll.oldest = oldest;
+    if (!scroll.follow && evicted > 0 && scroll.row > 0.0F) {
+        ImGui::SetScrollY(ImGui::GetScrollY() - (static_cast<float>(evicted) * scroll.row));
     }
 
     ImGui::TableSetupScrollFreeze(0, 1);
@@ -39,6 +48,8 @@ void draw_packet_list(Capture &capture, const float height)
 
     // Only the visible rows are pulled out of the capture, so a table holding thousands of
     // packets costs a few dozen brief locks a frame rather than a copy of the whole thing.
+    auto selected = capture.selected();
+
     ImGuiListClipper clipper;
     clipper.Begin(static_cast<int>(capture.size()));
     while (clipper.Step()) {
@@ -53,8 +64,9 @@ void draw_packet_list(Capture &capture, const float height)
             ImGui::TableNextColumn();
             char number[24];
             std::snprintf(number, sizeof(number), "%llu", static_cast<unsigned long long>(record.number));
-            if (ImGui::Selectable(number, capture.selected() == index, ImGuiSelectableFlags_SpanAllColumns)) {
-                capture.select(index);
+            if (ImGui::Selectable(number, selected == record.number, ImGuiSelectableFlags_SpanAllColumns)) {
+                capture.select(record.number);
+                selected = record.number;
             }
 
             ImGui::TableNextColumn();
@@ -78,6 +90,11 @@ void draw_packet_list(Capture &capture, const float height)
             }
             ImGui::PopStyleColor();
         }
+    }
+    scroll.row = clipper.ItemsHeight;
+
+    if (scroll.follow) {
+        ImGui::SetScrollHereY(1.0F);
     }
 
     ImGui::EndTable();

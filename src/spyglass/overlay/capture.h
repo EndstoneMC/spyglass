@@ -43,10 +43,11 @@ public:
     [[nodiscard]] Record at(std::size_t index) const;
     [[nodiscard]] std::optional<Record> selected_record() const;
     [[nodiscard]] Body selected_body() const;
+    [[nodiscard]] std::uint64_t oldest() const;
     [[nodiscard]] std::size_t bad() const;
 
-    [[nodiscard]] int selected() const;
-    void select(int index);
+    [[nodiscard]] std::uint64_t selected() const;
+    void select(std::uint64_t number);
 
     [[nodiscard]] bool running() const;
     void start();
@@ -54,12 +55,14 @@ public:
     void restart();
 
 private:
+    [[nodiscard]] const Record *at_number(std::uint64_t number) const;
+
     mutable std::mutex mutex_;
     std::deque<Record> records_;
     std::uint64_t counter_{0};
     std::size_t bad_{0};
     double started_{-1.0};
-    int selected_{-1};
+    std::uint64_t selected_{0};
     bool running_{true};
 };
 

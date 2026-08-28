@@ -56,22 +56,40 @@ Record Capture::at(const std::size_t index) const
     return records_[index];
 }
 
+const Record *Capture::at_number(const std::uint64_t number) const
+{
+    if (records_.empty() || number < records_.front().number) {
+        return nullptr;
+    }
+    const auto index = number - records_.front().number;
+    if (index >= records_.size()) {
+        return nullptr;
+    }
+    return &records_[static_cast<std::size_t>(index)];
+}
+
 std::optional<Record> Capture::selected_record() const
 {
     const std::lock_guard lock{mutex_};
-    if (selected_ < 0 || selected_ >= static_cast<int>(records_.size())) {
-        return std::nullopt;
+    if (const auto *record = at_number(selected_)) {
+        return *record;
     }
-    return records_[static_cast<std::size_t>(selected_)];
+    return std::nullopt;
 }
 
 Body Capture::selected_body() const
 {
     const std::lock_guard lock{mutex_};
-    if (selected_ < 0 || selected_ >= static_cast<int>(records_.size())) {
-        return {};
+    if (const auto *record = at_number(selected_)) {
+        return record->body;
     }
-    return records_[static_cast<std::size_t>(selected_)].body;
+    return {};
+}
+
+std::uint64_t Capture::oldest() const
+{
+    const std::lock_guard lock{mutex_};
+    return records_.empty() ? 0 : records_.front().number;
 }
 
 std::size_t Capture::bad() const
@@ -80,16 +98,16 @@ std::size_t Capture::bad() const
     return bad_;
 }
 
-int Capture::selected() const
+std::uint64_t Capture::selected() const
 {
     const std::lock_guard lock{mutex_};
     return selected_;
 }
 
-void Capture::select(const int index)
+void Capture::select(const std::uint64_t number)
 {
     const std::lock_guard lock{mutex_};
-    selected_ = index;
+    selected_ = number;
 }
 
 bool Capture::running() const
@@ -117,7 +135,7 @@ void Capture::restart()
     counter_ = 0;
     bad_ = 0;
     started_ = -1.0;
-    selected_ = -1;
+    selected_ = 0;
     running_ = true;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spyglass/overlay/capture.h"
+#include "spyglass/overlay/pane/packet_list.h"
 
 namespace spyglass {
 
@@ -21,6 +22,7 @@ private:
     bool visible_{true};
     float list_share_{0.45F};
     float details_share_{0.30F};
+    ListScroll list_scroll_;
     bool errors_open_{true};
 };
 
