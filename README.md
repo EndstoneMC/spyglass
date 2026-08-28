@@ -55,7 +55,9 @@ Nothing is written to disk. The capture lives in the overlay and goes with the c
 
 ### Windows
 
-Build it below, then start Minecraft and run the injector beside the DLL:
+Unpack `spyglass-vX.Y.Z-windows-x64.zip` from the
+[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below. Start Minecraft, then run
+the injector beside the DLL:
 
 ```shell
 spyglass.exe
@@ -79,17 +81,18 @@ keeps working underneath it.
 
 There the game runs under the
 [Minecraft Bedrock Launcher](https://github.com/minecraft-linux/mcpelauncher-manifest), which loads shared objects
-as mods, so there is no injector and nothing to elevate. Build it below, then put it where the launcher looks:
+as mods, so there is no injector and nothing to elevate. Unpack `spyglass-vX.Y.Z-linux-x64.zip` from the
+[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below, then put the shared
+object where the launcher looks:
 
 ```shell
-install -D build/relwithdebinfo-android/libspyglass.so \
-    ~/.local/share/mcpelauncher/mods/spyglass/0.1.0/x86_64/libspyglass.so
+install -D libspyglass.so ~/.local/share/mcpelauncher/mods/spyglass/0.2.0/x86_64/libspyglass.so
 ```
 
 Write a `mod.json` beside it naming the mod:
 
 ```json
-{ "name": "spyglass", "version": "0.1.0", "arch": "x86_64" }
+{ "name": "spyglass", "version": "0.2.0", "arch": "x86_64" }
 ```
 
 Then add that directory under `Mods` in the profile you play, and start the game.
