@@ -100,12 +100,12 @@ void View::draw()
             taken += details;
         }
 
-        draw_packet_bytes(capture_, usable - taken);
+        draw_packet_bytes(capture_, bytes_view_, usable - taken);
 
         ImGui::EndChild();
 
         ImGui::Separator();
-        draw_status_bar(capture_);
+        draw_status_bar(capture_, bytes_view_);
     }
     ImGui::End();
 }

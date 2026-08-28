@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spyglass/overlay/capture.h"
+#include "spyglass/overlay/pane/packet_bytes.h"
 #include "spyglass/overlay/pane/packet_list.h"
 
 namespace spyglass {
@@ -23,6 +24,7 @@ private:
     float list_share_{0.45F};
     float details_share_{0.30F};
     ListScroll list_scroll_;
+    BytesView bytes_view_;
     bool errors_open_{true};
 };
 
