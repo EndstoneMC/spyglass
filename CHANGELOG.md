@@ -1,0 +1,70 @@
+# Changelog
+
+All notable changes to spyglass are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Every packet the client sends and receives is captured, not only the ones that failed to decode. The
+  overlay is now laid out as a packet capture: the list of packets, the details of the selected one,
+  and its bytes.
+- The details pane breaks a packet down into the frame, the packet, and, where the decode failed, the
+  error and the Bedrock call stack under it.
+- Call stack frames resolve to a source file and line on a retail client, which strips the file names
+  out and leaves a hash behind.
+- The part of a body the decode never reached is tinted, so the byte the client stopped on is the
+  first one under the tint.
+- Bytes can be searched for hex or text, selected by click, drag and shift-click, and copied as a hex
+  dump, a hex stream, printable text, a C array or base64. `Show text...` puts the same output in a
+  box to read where the clipboard cannot be used.
+- `Start`, `Stop` and `Restart` for the capture, and a status bar carrying the packet total, the share
+  that failed, and the extent of the byte selection.
+- The list follows the newest packet until you scroll away from it.
+- Support for the Windows preview client alongside the release client. Spyglass reads the client's own
+  name out of the running process and picks the matching patterns before it scans, so one build covers
+  both.
+- An MIT license file.
+
+### Changed
+
+- Packets the client sends are captured on both platforms and always, rather than behind a Linux-only
+  option.
+- The overlay takes the mouse and the keyboard only while the game has released the cursor and the
+  pointer is over the overlay. An overlay left open during play no longer stops mouse-look or makes
+  the game react to a pointer resting on it.
+- The capture keeps the last 64 MB of packet bodies rather than a fixed number of packets. A count is
+  the wrong unit when a chat packet and a resource pack chunk differ by four orders of magnitude.
+- Both platforms build through `CMakePresets.json`, and dependencies are fetched during configure
+  rather than installed with Conan first.
+
+### Removed
+
+- `spyglass.log`, `events.jsonl`, `traffic.bin` and the output directory that held them. Nothing is
+  written to disk; the capture lives in the overlay and goes with the client when it closes.
+- `Record`, `Pause`, `Keep bodies`, `Save hex` and the packet totals tab, all folded into the capture
+  window.
+- Copying a whole report or its JSON. The details and the bytes are copied out of their own panes.
+- Patching vtables in the client to see sent packets. Spyglass no longer writes to the client at all.
+
+## [0.1.0] - 2026-08-19
+
+### Added
+
+- Packet decode diagnostics for the Minecraft: Bedrock client on Windows: which packet the
+  client failed to read, how far into it the decode got, the reason it gave, and the Bedrock
+  call stack that carried the failure.
+- Diagnostics for packets that decode successfully but leave bytes unread, which usually means
+  the two sides disagree about a field.
+- An overlay on **Insert** listing every diagnostic of the session with its full report and the
+  raw packet body, and copying either the report or the JSON to the clipboard.
+- `spyglass.log` and `events.jsonl` under `%LOCALAPPDATA%\spyglass`, one line and one JSON
+  object per diagnostic.
+- An injector that asks for elevation itself and grants the payload the rights a packaged app
+  needs before loading it into the client.
+
+[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/EndstoneMC/spyglass/releases/tag/v0.1.0
