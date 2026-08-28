@@ -1,0 +1,112 @@
+// Copyright (c) 2024, The Endstone Project. (https://endstone.dev) All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
+
+enum class DevConnectionQuality : int {
+    OFF = 0,
+    NO_LIMIT = 1,
+    PHONE_4G = 2,
+    PHONE_3G = 3,
+    SLOW = 4,
+    VERY_SLOW = 5,
+};
+
+enum class Compressibility : int {
+    Compressible = 0,
+    Incompressible = 1,
+};
+
+enum class PacketCompressionAlgorithm : std::uint16_t {
+    ZLib = 0,
+    Snappy = 1,
+    None = static_cast<std::uint16_t>(-1),
+};
+
+struct NetworkSettingOptions {
+    std::uint16_t compression_threshold;
+    PacketCompressionAlgorithm compression_algorithm;
+    bool client_throttle_enabled;
+    std::uint8_t client_throttle_threshold;
+    float client_throttle_scalar;
+    bool raknet_join_flood_protection_enabled;
+    bool encryption_disabled;
+    DevConnectionQuality dev_connection_quality;
+};
+static_assert(sizeof(NetworkSettingOptions) == 20);
+
+class NetworkPeer {
+public:
+    using PacketRecvTimepoint = std::chrono::steady_clock::time_point;
+    using PacketRecvTimepointPtr = std::shared_ptr<PacketRecvTimepoint>;
+
+    enum class Reliability : int {
+        Reliable = 0,
+        ReliableOrdered = 1,
+        Unreliable = 2,
+        UnreliableSequenced = 3,
+    };
+    enum class DataStatus : int {
+        HasData = 0,
+        NoData = 1,
+        BrokenData = 2,
+    };
+    enum class NetworkLoad : int {
+        Unrestricted = 0,
+        Low = 1,
+        Medium = 2,
+        High = 3,
+    };
+    struct NetworkStatus {
+        NetworkLoad load;
+        std::chrono::milliseconds current_ping;
+        std::chrono::milliseconds average_ping;
+        int approximate_max_bps;
+        float current_packet_loss;
+        float average_packet_loss;
+        std::uint64_t total_bytes_received;
+        std::uint64_t total_bytes_sent;
+        std::uint64_t current_bytes_send_buffer;
+        int ice_state;
+        bool using_relays;
+    };
+
+    virtual ~NetworkPeer() = default;
+    virtual void sendPacket(const std::string &, Reliability, Compressibility) = 0;
+    [[nodiscard]] virtual NetworkStatus getNetworkStatus() const = 0;
+    virtual void update()
+    {
+        if (peer_) {
+            peer_->update();
+        }
+    }
+    virtual void flush(std::function<void()> &&callback)
+    {
+        if (peer_) {
+            peer_->flush(std::move(callback));
+        }
+    }
+    [[nodiscard]] virtual bool isLocal() const { return peer_ && peer_->isLocal(); }
+    [[nodiscard]] virtual bool isEncrypted() const { return peer_ && peer_->isEncrypted(); }
+    [[nodiscard]] virtual bool isLan() const { return peer_ && peer_->isLan(); }
+
+protected:
+    virtual DataStatus _receivePacket(std::string &out_data, const PacketRecvTimepointPtr &timepoint_ptr) = 0;
+    std::shared_ptr<NetworkPeer> peer_;
+};
