@@ -19,8 +19,7 @@ namespace {
 constexpr float kSplitterHeight = 6.0F;
 constexpr float kPreferredMinimum = 60.0F;
 
-// TODO: flip when the details pane has fields to show.
-constexpr bool kDetailsPane = false;
+constexpr bool kDetailsPane = true;
 
 void splitter(const char *id, float &share, const float usable)
 {

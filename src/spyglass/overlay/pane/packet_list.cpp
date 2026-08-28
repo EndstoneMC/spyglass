@@ -23,7 +23,7 @@ void draw_packet_list(Capture &capture, const float height)
 {
     constexpr auto flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                            ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
-    if (!ImGui::BeginTable("packets", 6, flags, ImVec2{-1.0F, height})) {
+    if (!ImGui::BeginTable("packets", 7, flags, ImVec2{-1.0F, height})) {
         return;
     }
 
@@ -32,6 +32,7 @@ void draw_packet_list(Capture &capture, const float height)
     ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 84.0F);
     ImGui::TableSetupColumn("Source", ImGuiTableColumnFlags_WidthFixed, 90.0F);
     ImGui::TableSetupColumn("Destination", ImGuiTableColumnFlags_WidthFixed, 90.0F);
+    ImGui::TableSetupColumn("Id", ImGuiTableColumnFlags_WidthFixed, 44.0F);
     ImGui::TableSetupColumn("Length", ImGuiTableColumnFlags_WidthFixed, 60.0F);
     ImGui::TableSetupColumn("Info", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableHeadersRow();
@@ -62,6 +63,8 @@ void draw_packet_list(Capture &capture, const float height)
             text(record.direction == Direction::Outbound ? "client" : "server");
             ImGui::TableNextColumn();
             text(record.direction == Direction::Outbound ? "server" : "client");
+            ImGui::TableNextColumn();
+            ImGui::Text("%d", record.id);
             ImGui::TableNextColumn();
             ImGui::Text("%u", static_cast<unsigned>(record.body ? record.body->size() : 0));
 

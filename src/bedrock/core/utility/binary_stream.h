@@ -22,6 +22,7 @@ public:
     }
     virtual ~ReadOnlyBinaryStream() = default;
 
+    void setReadPointer(const std::size_t position) { read_pointer_ = position; }
     [[nodiscard]] std::size_t getReadPointer() const { return read_pointer_; }
     [[nodiscard]] std::size_t getLength() const { return view_.size(); }
     [[nodiscard]] std::size_t getUnreadLength() const

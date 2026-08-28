@@ -56,6 +56,15 @@ Record Capture::at(const std::size_t index) const
     return records_[index];
 }
 
+std::optional<Record> Capture::selected_record() const
+{
+    const std::lock_guard lock{mutex_};
+    if (selected_ < 0 || selected_ >= static_cast<int>(records_.size())) {
+        return std::nullopt;
+    }
+    return records_[static_cast<std::size_t>(selected_)];
+}
+
 Body Capture::selected_body() const
 {
     const std::lock_guard lock{mutex_};

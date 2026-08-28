@@ -5,6 +5,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,11 @@ enum class Direction : int {
 
 using Body = std::shared_ptr<const std::vector<std::uint8_t>>;
 
+struct Node {
+    std::string label;
+    std::vector<Node> children;
+};
+
 struct Record {
     std::uint64_t number{0};
     double time{0.0};
@@ -25,6 +31,7 @@ struct Record {
     std::string name;
     bool decoded{true};
     std::uint32_t unread{0};
+    std::optional<Node> error;
     Body body;
 };
 
@@ -34,6 +41,7 @@ public:
 
     [[nodiscard]] std::size_t size() const;
     [[nodiscard]] Record at(std::size_t index) const;
+    [[nodiscard]] std::optional<Record> selected_record() const;
     [[nodiscard]] Body selected_body() const;
     [[nodiscard]] std::size_t bad() const;
 
