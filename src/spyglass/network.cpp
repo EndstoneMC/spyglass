@@ -27,6 +27,7 @@ namespace {
 void *g_send_packet = nullptr;
 void *g_read_no_header = nullptr;
 void *g_create_packet = nullptr;
+std::atomic<const cereal::ReflectionCtx *> g_reflection{nullptr};
 spyglass::Hooks g_hooks;
 
 constexpr bool kBreakFirstSubChunk = false;
@@ -92,7 +93,7 @@ void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::
         .name = name_of(id),
         .decoded = header.asExpected().has_value(),
         .unread = header.asExpected().has_value() ? 0U : static_cast<std::uint32_t>(data.size()),
-        .body = body_of(data),
+        .body = body_of(std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size()))),
     });
     SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::sendPacket, g_send_packet, this, data, reliability, compressible);
 }
@@ -100,6 +101,7 @@ void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::
 Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &reflection_ctx,
                                            const SubClientId &sub_id)
 {
+    g_reflection.store(&reflection_ctx, std::memory_order_relaxed);
     const auto begin = stream.getReadPointer();
     const auto view = stream.getView();
 
@@ -127,6 +129,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
         .name = std::string{getName()},
         .decoded = result.asExpected().has_value(),
         .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
+        .sub_id = static_cast<std::uint8_t>(sub_id),
         .error = error_of(result),
         .body = body_of(view.substr(std::min(begin, view.size()))),
     });
@@ -169,6 +172,31 @@ const std::vector<std::string> &packet_names()
         return table;
     }();
     return names;
+}
+
+const cereal::ReflectionCtx *reflection_ctx()
+{
+    return g_reflection.load(std::memory_order_relaxed);
+}
+
+std::optional<Node> error_node(const Bedrock::Result<void> &result)
+{
+    return error_of(result);
+}
+
+std::shared_ptr<Packet> create_packet(const int id)
+{
+    if (g_create_packet == nullptr || id < 0) {
+        return nullptr;
+    }
+    const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
+    return create(static_cast<MinecraftPacketIds>(id));
+}
+
+Bedrock::Result<void> read_no_header(Packet &packet, ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &ctx,
+                                     const SubClientId sub_id)
+{
+    return SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, &packet, stream, ctx, sub_id);
 }
 
 }  // namespace spyglass

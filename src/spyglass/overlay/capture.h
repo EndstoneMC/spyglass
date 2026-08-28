@@ -33,6 +33,7 @@ struct Record {
     std::string name;
     bool decoded{true};
     std::uint32_t unread{0};
+    std::uint8_t sub_id{0};
     std::optional<Node> error;
     Body body;
 };

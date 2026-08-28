@@ -8,6 +8,7 @@
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/options.h"
 #include "spyglass/overlay/theme.h"
+#include "spyglass/reflect.h"
 
 namespace spyglass {
 namespace {
@@ -51,7 +52,6 @@ void draw_packet_details(const Record *const record, ViewOptions &options, const
     if (record != nullptr) {
         const auto number = static_cast<unsigned long long>(record->number);
         const std::size_t length = record->body ? record->body->size() : 0;
-        const bool outbound = record->direction == Direction::Outbound;
 
         set_open(options);
         if (ImGui::TreeNodeEx("frame", kBranch, "Frame %llu: %zu bytes captured at %.6f", number, length,
@@ -63,12 +63,21 @@ void draw_packet_details(const Record *const record, ViewOptions &options, const
         }
 
         set_open(options);
-        if (ImGui::TreeNodeEx("packet", kBranch, "Minecraft Bedrock: %s",
+        if (ImGui::TreeNodeEx("packet", kBranch, "Bedrock Protocol: %s",
                               record->name.empty() ? "unnamed" : record->name.c_str())) {
             ImGui::TreeNodeEx("id", kLeaf, "Id: %d", record->id);
-            ImGui::TreeNodeEx("source", kLeaf, "Source: %s", outbound ? "client" : "server");
-            ImGui::TreeNodeEx("destination", kLeaf, "Destination: %s", outbound ? "server" : "client");
-            ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
+            if (record->unread > 0) {
+                ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
+            }
+            if (const auto *fields = decoded_fields(*record); fields != nullptr) {
+                int child = 0;
+                for (const auto &field : fields->children) {
+                    draw_node(options, field, child++);
+                }
+            }
+            else {
+                ImGui::TreeNodeEx("unavailable", kLeaf, "no fields decoded");
+            }
             ImGui::TreePop();
         }
 
