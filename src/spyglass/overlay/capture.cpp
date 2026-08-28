@@ -77,15 +77,6 @@ std::optional<Record> Capture::selected_record() const
     return std::nullopt;
 }
 
-Body Capture::selected_body() const
-{
-    const std::lock_guard lock{mutex_};
-    if (const auto *record = at_number(selected_)) {
-        return record->body;
-    }
-    return {};
-}
-
 std::uint64_t Capture::oldest() const
 {
     const std::lock_guard lock{mutex_};

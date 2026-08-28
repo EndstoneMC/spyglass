@@ -42,7 +42,6 @@ public:
     [[nodiscard]] std::size_t size() const;
     [[nodiscard]] Record at(std::size_t index) const;
     [[nodiscard]] std::optional<Record> selected_record() const;
-    [[nodiscard]] Body selected_body() const;
     [[nodiscard]] std::uint64_t oldest() const;
     [[nodiscard]] std::size_t bad() const;
 
