@@ -6,9 +6,6 @@
 namespace spyglass {
 namespace {
 
-constexpr std::size_t kRetained = 65536;
-constexpr std::size_t kRetainedBytes = 64 * 1024 * 1024;
-
 double now()
 {
     using namespace std::chrono;
@@ -27,6 +24,10 @@ void Capture::record(Record record)
 {
     const std::lock_guard lock{mutex_};
     if (!running_) {
+        return;
+    }
+    if (!capture_filter_.matches(record)) {
+        ++rejected_;
         return;
     }
     if (started_ < 0.0) {
@@ -75,8 +76,12 @@ void Capture::record(Record record)
 
     bytes_ += length;
     records_.push_back(std::move(record));
+    trim();
+}
 
-    while (records_.size() > kRetained || (bytes_ > kRetainedBytes && records_.size() > 1)) {
+void Capture::trim()
+{
+    while (records_.size() > retention_.records || (bytes_ > retention_.bytes && records_.size() > 1)) {
         bytes_ -= records_.front().body ? records_.front().body->size() : 0;
         records_.pop_front();
     }
@@ -142,6 +147,7 @@ Statistics Capture::statistics() const
     return {
         .total = counter_,
         .bad = bad_,
+        .rejected = rejected_,
         .inbound = inbound_,
         .outbound = outbound_,
         .inbound_bytes = inbound_bytes_,
@@ -199,6 +205,7 @@ void Capture::restart()
     rates_.clear();
     counter_ = 0;
     bad_ = 0;
+    rejected_ = 0;
     inbound_ = 0;
     outbound_ = 0;
     inbound_bytes_ = 0;
@@ -208,6 +215,34 @@ void Capture::restart()
     wall_started_ = 0.0;
     selected_ = 0;
     running_ = true;
+}
+
+Retention Capture::retention() const
+{
+    const std::lock_guard lock{mutex_};
+    return retention_;
+}
+
+void Capture::set_retention(const Retention retention)
+{
+    const std::lock_guard lock{mutex_};
+    if (retention_ == retention) {
+        return;
+    }
+    retention_ = retention;
+    trim();
+}
+
+Filter Capture::capture_filter() const
+{
+    const std::lock_guard lock{mutex_};
+    return capture_filter_;
+}
+
+void Capture::set_capture_filter(const Filter &filter)
+{
+    const std::lock_guard lock{mutex_};
+    capture_filter_ = filter;
 }
 
 }  // namespace spyglass

@@ -301,7 +301,10 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
             capture.restart();
         }
         ImGui::Separator();
-        ImGui::MenuItem("Filter", nullptr, &options.filter_window);
+        ImGui::MenuItem("Options", nullptr, &options.capture_options_window);
+        ImGui::MenuItem("Capture Filter", nullptr, &options.capture_filter_window);
+        ImGui::Separator();
+        ImGui::MenuItem("Display Filter", nullptr, &options.filter_window);
         ImGui::EndMenu();
     }
 
@@ -361,6 +364,31 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
         }
         ImGui::EndPopup();
     }
+}
+
+void draw_capture_options(Capture &capture, Filter &capture_filter, bool &open)
+{
+    if (ImGui::Begin("Spyglass: capture options", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        auto retention = capture.retention();
+        auto records = static_cast<int>(retention.records);
+        auto megabytes = static_cast<int>(retention.bytes / (1024 * 1024));
+
+        ImGui::TextColored(kMuted, "The capture drops the oldest packet once either limit is reached.");
+        ImGui::SetNextItemWidth(160.0F);
+        ImGui::InputInt("Retained packets", &records, 1024, 8192);
+        ImGui::SetNextItemWidth(160.0F);
+        ImGui::InputInt("Retained megabytes", &megabytes, 8, 64);
+
+        retention.records = static_cast<std::size_t>(std::max(records, 1));
+        retention.bytes = static_cast<std::size_t>(std::max(megabytes, 1)) * 1024 * 1024;
+        capture.set_retention(retention);
+
+        ImGui::Separator();
+        ImGui::Checkbox("Capture sent packets", &capture_filter.outbound);
+        ImGui::TextColored(kMuted, "Capture Filter drops packets before they are stored, so the budget above\n"
+                                   "is spent on what you asked for rather than on a chunk flood.");
+    }
+    ImGui::End();
 }
 
 void draw_about_window(bool &open)

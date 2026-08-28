@@ -33,6 +33,8 @@ struct ViewOptions {
     std::uint64_t detach{0};
     bool inspector{true};
     bool filter_window{false};
+    bool capture_filter_window{false};
+    bool capture_options_window{false};
     bool errors_window{true};
     bool about_window{false};
     bool expert_window{false};

@@ -20,6 +20,6 @@ struct FilterWindow {
     std::vector<FilterRow> rows;
 };
 
-void draw_filter_window(const Capture &capture, Filter &filter, FilterWindow &window, bool &open);
+void draw_filter_window(const char *title, const Capture &capture, Filter &filter, FilterWindow &window, bool &open);
 
 }  // namespace spyglass

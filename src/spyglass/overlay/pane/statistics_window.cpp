@@ -19,8 +19,8 @@ namespace spyglass {
 namespace {
 
 constexpr const char *kLengthLabels[kLengthBuckets] = {
-    "0 - 19",     "20 - 39",     "40 - 79",      "80 - 159",      "160 - 319",
-    "320 - 639",  "640 - 1279",  "1280 - 2559",  "2560 - 5119",   "5120 and above",
+    "0 - 19",    "20 - 39",    "40 - 79",     "80 - 159",    "160 - 319",
+    "320 - 639", "640 - 1279", "1280 - 2559", "2560 - 5119", "5120 and above",
 };
 
 constexpr float kGraphHeight = 180.0F;

@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "spyglass/overlay/filter.h"
+
 namespace spyglass {
 
 enum class Direction : int {
@@ -45,6 +47,13 @@ struct Visited {
 
 constexpr std::size_t kLengthBuckets = 10;
 
+struct Retention {
+    std::size_t records{65536};
+    std::size_t bytes{64 * 1024 * 1024};
+
+    bool operator==(const Retention &other) const = default;
+};
+
 struct Rate {
     std::uint64_t packets{0};
     std::size_t bytes{0};
@@ -53,6 +62,7 @@ struct Rate {
 struct Statistics {
     std::uint64_t total{0};
     std::uint64_t bad{0};
+    std::uint64_t rejected{0};
     std::uint64_t inbound{0};
     std::uint64_t outbound{0};
     std::size_t inbound_bytes{0};
@@ -105,8 +115,14 @@ public:
     void stop();
     void restart();
 
+    [[nodiscard]] Retention retention() const;
+    void set_retention(Retention retention);
+    [[nodiscard]] Filter capture_filter() const;
+    void set_capture_filter(const Filter &filter);
+
 private:
     [[nodiscard]] const Record *find(std::uint64_t number) const;
+    void trim();
 
     mutable std::mutex mutex_;
     std::deque<Record> records_;
@@ -116,6 +132,7 @@ private:
     std::vector<Rate> rates_;
     std::uint64_t counter_{0};
     std::uint64_t bad_{0};
+    std::uint64_t rejected_{0};
     std::uint64_t inbound_{0};
     std::uint64_t outbound_{0};
     std::size_t inbound_bytes_{0};
@@ -124,6 +141,8 @@ private:
     double started_{-1.0};
     double wall_started_{0.0};
     std::uint64_t selected_{0};
+    Retention retention_;
+    Filter capture_filter_;
     bool running_{true};
 };
 

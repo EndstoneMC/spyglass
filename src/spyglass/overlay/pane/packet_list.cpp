@@ -68,6 +68,9 @@ void draw_find_bar(Capture &capture, const Filter &filter, PacketList &list, Vie
     ImGui::SetNextItemWidth(240.0F);
     auto next = ImGui::InputTextWithHint("##find", "find a packet", list.find.query, sizeof(list.find.query),
                                          ImGuiInputTextFlags_EnterReturnsTrue);
+    if (ImGui::IsItemEdited()) {
+        list.find.missed = false;
+    }
 
     ImGui::SameLine();
     if (ImGui::ArrowButton("previous_packet", ImGuiDir_Up)) {
