@@ -34,7 +34,8 @@ add_library(spyglass SHARED
         src/spyglass/overlay/windows/input.cpp
         src/spyglass/overlay/windows/mouse.cpp
         src/spyglass/overlay/windows/overlay.cpp
-        src/spyglass/pattern.cpp)
+        src/spyglass/pattern.cpp
+        src/spyglass/signature.cpp)
 target_include_directories(spyglass PRIVATE src)
 target_link_libraries(spyglass PRIVATE
         nonstd::expected-lite

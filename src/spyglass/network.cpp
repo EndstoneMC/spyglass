@@ -7,7 +7,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -149,13 +148,11 @@ namespace spyglass {
 
 void install_network_hook()
 {
-    if (kBatchedSendPacket.empty() || kPacketReadNoHeader.empty() || kCreatePacket.empty()) {
-        throw std::runtime_error{"no packet patterns for this platform"};
-    }
-    g_create_packet = find(kCreatePacket);
-    static FunctionHook send{"BatchedNetworkPeer::sendPacket", find(kBatchedSendPacket),
+    const auto &signature = signatures();
+    g_create_packet = find(signature.create_packet);
+    static FunctionHook send{"BatchedNetworkPeer::sendPacket", find(signature.batched_send_packet),
                              detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
-    static FunctionHook read{"Packet::readNoHeader", find(kPacketReadNoHeader),
+    static FunctionHook read{"Packet::readNoHeader", find(signature.packet_read_no_header),
                              detail::fp_cast(&Packet::readNoHeader), &g_read_no_header};
 }
 
