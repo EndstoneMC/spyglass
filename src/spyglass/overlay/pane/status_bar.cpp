@@ -12,15 +12,15 @@ namespace spyglass {
 
 void draw_status_bar(const Capture &capture, const BytesView &bytes)
 {
-    const auto total = capture.size();
-    const auto bad = capture.bad();
+    const auto total = static_cast<unsigned long long>(capture.total());
+    const auto bad = static_cast<unsigned long long>(capture.bad());
     const double share = total == 0 ? 0.0 : (100.0 * static_cast<double>(bad)) / static_cast<double>(total);
 
-    ImGui::TextColored(kMuted, "Packets: %zu", total);
+    ImGui::TextColored(kMuted, "Packets: %llu", total);
     ImGui::SameLine();
     ImGui::TextColored(kMuted, "|");
     ImGui::SameLine();
-    ImGui::TextColored(bad == 0 ? kMuted : kBadPacket, "Bad: %zu (%.1f%%)", bad, share);
+    ImGui::TextColored(bad == 0 ? kMuted : kBadPacket, "Bad: %llu (%.1f%%)", bad, share);
 
     if (bytes.selected) {
         const auto first = std::min(bytes.anchor, bytes.cursor);
