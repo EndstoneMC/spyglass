@@ -22,6 +22,7 @@ namespace spyglass {
 namespace {
 
 constexpr std::size_t kBytesPerRow = 16;
+constexpr std::size_t kGroupSize = kBytesPerRow / 2;
 constexpr std::string_view kHexDigits = "0123456789ABCDEF";
 constexpr std::string_view kBase64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -43,9 +44,9 @@ struct Cell {
 Cell cell_of(const BytesView &view, const Layout &layout, const ImVec2 origin, const std::size_t offset,
              const bool ascii)
 {
-    const auto row = static_cast<float>(offset / kBytesPerRow);
+    const auto row = offset / kBytesPerRow;
     const auto column = offset % kBytesPerRow;
-    const auto y = origin.y + (row * view.line);
+    const auto y = origin.y + (static_cast<float>(row) * view.line);
 
     if (ascii) {
         const auto x = origin.x + layout.ascii + (static_cast<float>(column) * layout.glyph);
@@ -53,7 +54,7 @@ Cell cell_of(const BytesView &view, const Layout &layout, const ImVec2 origin, c
     }
 
     const auto x = origin.x + layout.hex + (static_cast<float>(column) * layout.cell) +
-                   (column >= kBytesPerRow / 2 ? layout.group : 0.0F);
+                   (column >= kGroupSize ? layout.group : 0.0F);
     return {ImVec2{x, y}, ImVec2{x + layout.cell, y + view.line}};
 }
 
@@ -77,7 +78,7 @@ std::optional<std::size_t> byte_at(const BytesView &view, const Layout &layout, 
         column = std::clamp((x - layout.ascii) / layout.glyph, 0.0F, last);
     }
     else {
-        const auto split = static_cast<float>(kBytesPerRow / 2) * layout.cell;
+        const auto split = static_cast<float>(kGroupSize) * layout.cell;
         auto local = x - layout.hex;
         if (local >= split + layout.group) {
             local -= layout.group;
@@ -139,7 +140,7 @@ std::string format_bytes(const std::span<const std::uint8_t> bytes, const std::s
         for (std::size_t row = 0; row < bytes.size(); row += kBytesPerRow) {
             text += std::format("{:0{}X}  ", offset + row, digits);
             for (std::size_t i = 0; i < kBytesPerRow; ++i) {
-                if (i == kBytesPerRow / 2) {
+                if (i == kGroupSize) {
                     text += ' ';
                 }
                 text += row + i < bytes.size() ? std::format("{:02X} ", bytes[row + i]) : std::string{"   "};
@@ -329,19 +330,6 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
         view.scroll_to_row = static_cast<long long>(view.anchor / kBytesPerRow);
     }
 
-    const auto body_height = std::max(0.0F, height - ImGui::GetFrameHeightWithSpacing());
-
-    ImFont *mono = nullptr;
-    for (auto *font : ImGui::GetIO().Fonts->Fonts) {
-        if (std::string_view{font->GetDebugName()} == "ProggyClean.ttf") {
-            mono = font;
-            break;
-        }
-    }
-    if (mono != nullptr) {
-        ImGui::PushFont(mono, mono->LegacySize);
-    }
-
     if (view.measured_font != ImGui::GetFont() || view.measured_size != ImGui::GetFontSize()) {
         char glyph[2] = {0, 0};
         view.glyph = 0.0F;
@@ -382,7 +370,7 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
     auto last = std::max(view.anchor, view.cursor);
 
     ImGui::SetNextWindowContentSize(ImVec2{layout.width, 0.0F});
-    ImGui::BeginChild("bytes", ImVec2{-1.0F, body_height},
+    ImGui::BeginChild("bytes", ImVec2{-1.0F, std::max(0.0F, height - ImGui::GetFrameHeightWithSpacing())},
                       ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{0.0F, 0.0F});
@@ -489,10 +477,9 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
 
                 const bool printable = byte >= 0x20 && byte < 0x7F;
                 const char glyph = printable ? static_cast<char>(byte) : '.';
-                draw->AddText(
-                    ImVec2{ascii.min.x + (0.5F * (layout.glyph - view.advance[static_cast<unsigned char>(glyph) - 0x20])),
-                           y},
-                    printable ? text_colour : muted, &glyph, &glyph + 1);
+                const auto glyph_width = view.advance[static_cast<unsigned char>(glyph) - 0x20];
+                draw->AddText(ImVec2{ascii.min.x + (0.5F * (layout.glyph - glyph_width)), y},
+                              printable ? text_colour : muted, &glyph, &glyph + 1);
             }
 
             if (view.selected) {
@@ -562,10 +549,6 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
 
     ImGui::PopStyleVar();
     ImGui::EndChild();
-
-    if (mono != nullptr) {
-        ImGui::PopFont();
-    }
 
     if (open_text) {
         ImGui::OpenPopup("bytes_text");

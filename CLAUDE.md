@@ -134,3 +134,9 @@ Spyglass finds its hooks by byte pattern. When a pattern stops matching exactly 
 install rather than guessing, and says so in the log. A client update therefore means refreshing
 patterns, not loosening the check — never relax a pattern to make it match again without confirming
 the match is the right function.
+
+A retail client also strips the file name out of every `Bedrock::CallStack::Frame`, leaving the
+literal "-" and a hash. `src/spyglass/filename_table.inc` maps that hash back to a name, and the
+head of that file says how the hash is computed. A client update that adds a source file renders
+its frames as `<hash>:line` until a line for it is added by hand. The table needs no other
+maintenance.

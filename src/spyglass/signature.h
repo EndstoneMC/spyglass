@@ -53,6 +53,20 @@ namespace spyglass {
 //    is unique in .rodata, the one relocation addend equal to it is typeinfo+8, and the one addend
 //    equal to that typeinfo is vtable+8. Windows has no such route because the game is built
 //    without RTTI
+//
+// MouseDevice::feed is where every mouse channel meets, so the overlay stops the game's mouse there
+// rather than at one transport. Windows only: the launcher owns input on Android.
+//
+// 1. the window procedure's own mouse handlers are dead whenever the GameInput runtime is up. each
+//    opens by testing the handler pointer at Platform_GameCore+0xa0 and does nothing when it is
+//    set, so the live mouse arrives from a per-frame poll rather than from a message
+// 2. that poll holds seven of feed's fourteen call sites. it takes an absolute screen position,
+//    puts it through AppPlatform::screenToClient and feeds it as a motion action
+// 3. feed is the seven-argument overload. the four-argument one takes no dx, dy or
+//    forceMotionlessPointer, so only this one reads four arguments back off the stack
+// 4. the prologue pushes eight registers, spills the four register arguments, then reads those
+//    stack arguments at rsp+0xb0, 0xb8, 0xc0 and 0xc8. that run is unique with no wildcard on
+//    1.26.40.5, 1.26.44.3 and 1.26.50.27
 
 #ifdef _WIN32
 constexpr std::string_view kBatchedSendPacket =
@@ -64,6 +78,9 @@ constexpr std::string_view kPacketReadNoHeader =
 constexpr std::string_view kCreatePacket =
     "56 48 83 EC 20 48 89 CE 81 FA 5F 01 00 00 77 ? 89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 C8 FF E0 0F "
     "57 C0 0F 11 06 48 89 F0 48 83 C4 20 5E";
+constexpr std::string_view kMouseFeed =
+    "41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC 48 44 89 CF 44 89 C3 89 D5 48 89 CE 44 0F B7 A4 24 C0 "
+    "00 00 00 44 0F B7 AC 24 B8 00 00 00 44 0F B7 BC 24 B0 00 00 00 0F B6 84 24 C8 00 00 00";
 #else
 constexpr std::string_view kBatchedSendPacket =
     "55 48 89 E5 41 57 41 56 41 55 41 54 53 48 83 EC 48 89 4D 9C 49 89 F6 48 89 FB 64 48 8B 04 25 28 00 "

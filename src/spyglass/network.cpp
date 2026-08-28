@@ -18,6 +18,7 @@
 #include "bedrock/network/minecraft_packets.h"
 #include "bedrock/network/packet.h"
 #include "spyglass/detail.h"
+#include "spyglass/filename.h"
 #include "spyglass/hook.h"
 #include "spyglass/overlay/view.h"
 #include "spyglass/pattern.h"
@@ -63,7 +64,13 @@ spyglass::Node node_of(const Bedrock::ErrorInfo<std::error_code> &info)
     spyglass::Node node{.label = std::format("{} ({} {})", info.error.message(), info.error.category().name(),
                                              info.error.value())};
     for (const auto &entry : info.call_stack.frames) {
-        auto label = std::format("{}:{}", entry.frame.filename, entry.frame.line);
+        auto filename = entry.frame.filename;
+        if (filename.empty() || filename == "-") {
+            filename = spyglass::filename_of(entry.frame.filename_hash);
+        }
+        auto label = filename.empty()
+                         ? std::format("<{:016x}>:{}", entry.frame.filename_hash, entry.frame.line)
+                         : std::format("{}:{}", filename, entry.frame.line);
         if (entry.context.has_value()) {
             label += std::format(" - {}", entry.context->value);
         }

@@ -21,6 +21,8 @@ public:
     void install();
     void shutdown();
 
+    [[nodiscard]] bool owns_mouse() const;
+
     void present(IDXGISwapChain *swap_chain);
     void before_resize();
     void observe_command_queue(ID3D12CommandQueue *queue);
@@ -42,6 +44,7 @@ private:
     float dpi_scale_{0.0F};
     bool context_ready_{false};
     bool unsupported_{false};
+    bool insert_down_{false};
 };
 
 }  // namespace spyglass

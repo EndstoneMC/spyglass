@@ -1,5 +1,6 @@
 #include "spyglass/overlay/pane/packet_details.h"
 
+#include <algorithm>
 #include <cstddef>
 
 #include <imgui.h>
@@ -59,9 +60,10 @@ void draw_packet_details(const Capture &capture, const float height)
         }
 
         if (record->error) {
+            const auto stopped = length - std::min<std::size_t>(record->unread, length);
             ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
             ImGui::SetNextItemOpen(true, ImGuiCond_Once);
-            if (ImGui::TreeNodeEx("error", kBranch, "Decode error")) {
+            if (ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped)) {
                 draw_node(*record->error, 0);
                 ImGui::TreePop();
             }

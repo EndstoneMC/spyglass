@@ -54,6 +54,10 @@ void View::onPacketReceive(Record record)
 
 void View::draw()
 {
+    if (!visible_) {
+        return;
+    }
+
     if (const auto failures = errors(); !failures.empty() && errors_open_) {
         ImGui::SetNextWindowSize(ImVec2{520.0F, 0.0F}, ImGuiCond_FirstUseEver);
         if (ImGui::Begin("spyglass: errors", &errors_open_)) {
@@ -62,10 +66,6 @@ void View::draw()
             }
         }
         ImGui::End();
-    }
-
-    if (!visible_) {
-        return;
     }
 
     ImGui::SetNextWindowSize(ImVec2{960.0F, 720.0F}, ImGuiCond_FirstUseEver);
@@ -78,7 +78,9 @@ void View::draw()
 
         const float pane_count = kDetailsPane ? 3.0F : 2.0F;
         const float splitter_count = pane_count - 1.0F;
-        const float usable = std::max(0.0F, ImGui::GetContentRegionAvail().y - (splitter_count * kSplitterHeight));
+        const float usable =
+            std::max(0.0F, ImGui::GetContentRegionAvail().y - (splitter_count * kSplitterHeight) -
+                               ((pane_count + splitter_count - 1.0F) * ImGui::GetStyle().ItemSpacing.y));
         const float smallest = std::min(kPreferredMinimum, usable / pane_count);
 
         const float list = std::clamp(usable * list_share_, smallest, usable - (splitter_count * smallest));

@@ -15,6 +15,7 @@ add_subdirectory(third_party)
 
 add_library(spyglass SHARED
         src/spyglass/error.cpp
+        src/spyglass/filename.cpp
         src/spyglass/hook.cpp
         src/spyglass/install.cpp
         src/spyglass/main.cpp
@@ -31,6 +32,7 @@ add_library(spyglass SHARED
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp
         src/spyglass/overlay/windows/input.cpp
+        src/spyglass/overlay/windows/mouse.cpp
         src/spyglass/overlay/windows/overlay.cpp
         src/spyglass/pattern.cpp)
 target_include_directories(spyglass PRIVATE src)

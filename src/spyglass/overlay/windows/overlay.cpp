@@ -16,11 +16,14 @@
 #include "spyglass/overlay/install.h"
 #include "spyglass/overlay/windows/d3d11_backend.h"
 #include "spyglass/overlay/windows/d3d12_backend.h"
+#include "spyglass/overlay/windows/mouse.h"
 
 using Microsoft::WRL::ComPtr;
 
 namespace spyglass {
 namespace {
+
+constexpr bool kInputDiagnostics = false;
 
 constexpr std::size_t kPresentSlot = 8;
 constexpr std::size_t kResizeBuffersSlot = 13;
@@ -145,6 +148,8 @@ void Overlay::install()
     present_hook_ =
         FunctionHook{"IDXGISwapChain::Present", swap_chain->first, reinterpret_cast<void *>(&present_detour),
                            reinterpret_cast<void **>(&g_present)};
+
+    install_mouse_hook();
 }
 
 void Overlay::shutdown()
@@ -158,6 +163,11 @@ void Overlay::shutdown()
         ImGui::DestroyContext();
         context_ready_ = false;
     }
+}
+
+bool Overlay::owns_mouse() const
+{
+    return context_ready_ && input_.cursor_free() && ImGui::GetIO().WantCaptureMouse;
 }
 
 void Overlay::observe_command_queue(ID3D12CommandQueue *queue)
@@ -228,10 +238,9 @@ bool Overlay::ensure_ready(IDXGISwapChain *swap_chain)
     if (!context_ready_) {
         create_context();
     }
-    input_.attach(desc.OutputWindow, {
-                                         .visible = [this] { return View::getInstance().visible(); },
-                                         .toggle = [this] { View::getInstance().toggle(); },
-                                     });
+    if (!input_.attach(desc.OutputWindow)) {
+        return false;
+    }
 
     backend_ = D3D12Backend::create(swap_chain, command_queue_);
     if (!backend_) {
@@ -254,17 +263,38 @@ void Overlay::present(IDXGISwapChain *swap_chain)
         return;
     }
 
+    const bool insert_down = GetForegroundWindow() == window_ && (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
+    if (insert_down && !insert_down_) {
+        View::getInstance().toggle();
+    }
+    insert_down_ = insert_down;
+
     follow_window_dpi();
 
     CURSORINFO cursor{.cbSize = sizeof(CURSORINFO)};
     const bool os_cursor_visible =
         GetCursorInfo(&cursor) != 0 && (cursor.flags & CURSOR_SHOWING) != 0 && cursor.hCursor != nullptr;
     ImGui::GetIO().MouseDrawCursor = !os_cursor_visible;
+    input_.set_cursor_free(os_cursor_visible);
 
     backend_->new_frame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
     View::getInstance().draw();
+    if (kInputDiagnostics) {
+        ImGui::SetNextWindowBgAlpha(0.6F);
+        if (ImGui::Begin("spyglass: input", nullptr,
+                         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                             ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav)) {
+            ImGui::Text("%s hwnd %p subclass %d msg %llu input %llu eaten %llu ptr %llu raw %llu capture %d/%d "
+                        "cursor %d",
+                        __TIME__, static_cast<void *>(input_.window()), input_.installed() ? 1 : 0, input_.seen(),
+                        input_.seen_input(), input_.eaten(), input_.pointer(), input_.raw(),
+                        ImGui::GetIO().WantCaptureMouse ? 1 : 0, ImGui::GetIO().WantCaptureKeyboard ? 1 : 0,
+                        os_cursor_visible ? 1 : 0);
+        }
+        ImGui::End();
+    }
     ImGui::Render();
     backend_->render(swap_chain);
 }
