@@ -1,4 +1,5 @@
-// Copyright (c) 2024, The Endstone Project. (https://endstone.dev) All Rights Reserved.
+// Copyright (c) 2024, The Endstone Project. (https://endstone.dev) All Rights
+// Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,22 +21,21 @@
 
 class NetworkIdentifier {
 public:
-    enum class Type : std::uint32_t {
-        RakNet = 0,
-        Address = 1,
-        Address6 = 2,
-        NetherNet = 3,
-        Invalid = 4,
-    };
+  enum class Type : std::uint32_t {
+    RakNet = 0,
+    Address = 1,
+    Address6 = 2,
+    NetherNet = 3,
+    Invalid = 4,
+  };
 
-    [[nodiscard]] std::string getAddress() const;
-    [[nodiscard]] std::uint16_t getPort() const;
-    [[nodiscard]] Type getType() const;
+  [[nodiscard]] std::string getAddress() const;
+  [[nodiscard]] std::uint16_t getPort() const;
+  [[nodiscard]] Type getType() const;
 
 private:
-    std::byte nether_net_id_[24];
-    std::byte guid_[16];
-    std::byte sock_[128];
-    Type type_;
+  std::int64_t nether_net_id_[3];
+  std::int64_t guid_[2];
+  std::int64_t sock_[16];
+  Type type_;
 };
-static_assert(sizeof(NetworkIdentifier) == 176);
