@@ -15,6 +15,12 @@ double now()
     return duration<double>(steady_clock::now().time_since_epoch()).count();
 }
 
+double wall_now()
+{
+    using namespace std::chrono;
+    return duration<double>(system_clock::now().time_since_epoch()).count();
+}
+
 }  // namespace
 
 void Capture::record(Record record)
@@ -25,6 +31,7 @@ void Capture::record(Record record)
     }
     if (started_ < 0.0) {
         started_ = now();
+        wall_started_ = wall_now();
     }
 
     record.number = ++counter_;
@@ -32,14 +39,41 @@ void Capture::record(Record record)
     if (!record.decoded) {
         ++bad_;
     }
+
+    const auto length = record.body ? record.body->size() : 0;
     if (record.id >= 0) {
         const auto id = static_cast<std::size_t>(record.id);
         if (id >= counts_.size()) {
             counts_.resize(id + 1, 0);
+            id_bytes_.resize(id + 1, 0);
         }
         ++counts_[id];
+        id_bytes_[id] += length;
     }
-    bytes_ += record.body ? record.body->size() : 0;
+
+    auto bucket = std::size_t{0};
+    for (auto edge = std::size_t{20}; bucket + 1 < kLengthBuckets && length >= edge; edge *= 2) {
+        ++bucket;
+    }
+    ++lengths_[bucket];
+
+    if (record.direction == Direction::Outbound) {
+        ++outbound_;
+        outbound_bytes_ += length;
+    }
+    else {
+        ++inbound_;
+        inbound_bytes_ += length;
+    }
+
+    const auto second = static_cast<std::size_t>(record.time);
+    if (second >= rates_.size()) {
+        rates_.resize(second + 1);
+    }
+    ++rates_[second].packets;
+    rates_[second].bytes += length;
+
+    bytes_ += length;
     records_.push_back(std::move(record));
 
     while (records_.size() > kRetained || (bytes_ > kRetainedBytes && records_.size() > 1)) {
@@ -52,6 +86,12 @@ std::uint64_t Capture::total() const
 {
     const std::lock_guard lock{mutex_};
     return counter_;
+}
+
+double Capture::wall_start() const
+{
+    const std::lock_guard lock{mutex_};
+    return wall_started_;
 }
 
 const Record *Capture::find(const std::uint64_t number) const
@@ -96,6 +136,29 @@ std::vector<std::uint64_t> Capture::counts() const
     return counts_;
 }
 
+Statistics Capture::statistics() const
+{
+    const std::lock_guard lock{mutex_};
+    return {
+        .total = counter_,
+        .bad = bad_,
+        .inbound = inbound_,
+        .outbound = outbound_,
+        .inbound_bytes = inbound_bytes_,
+        .outbound_bytes = outbound_bytes_,
+        .retained = records_.size(),
+        .retained_bytes = bytes_,
+        .oldest = records_.empty() ? 0 : records_.front().number,
+        .newest = records_.empty() ? 0 : records_.back().number,
+        .duration = records_.empty() ? 0.0 : records_.back().time,
+        .wall_start = wall_started_,
+        .counts = counts_,
+        .byte_counts = id_bytes_,
+        .lengths = lengths_,
+        .rates = rates_,
+    };
+}
+
 std::uint64_t Capture::selected() const
 {
     const std::lock_guard lock{mutex_};
@@ -131,10 +194,18 @@ void Capture::restart()
     const std::lock_guard lock{mutex_};
     records_.clear();
     counts_.clear();
+    id_bytes_.clear();
+    lengths_.fill(0);
+    rates_.clear();
     counter_ = 0;
     bad_ = 0;
+    inbound_ = 0;
+    outbound_ = 0;
+    inbound_bytes_ = 0;
+    outbound_bytes_ = 0;
     bytes_ = 0;
     started_ = -1.0;
+    wall_started_ = 0.0;
     selected_ = 0;
     running_ = true;
 }

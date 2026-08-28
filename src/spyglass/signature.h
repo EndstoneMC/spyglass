@@ -75,6 +75,7 @@
 namespace spyglass {
 
 struct Signatures {
+    std::string_view name;
     std::string_view batched_send_packet;
     std::string_view packet_read_no_header;
     std::string_view create_packet;
@@ -86,6 +87,7 @@ const Signatures &signatures();
 #ifdef _WIN32
 
 constexpr Signatures kReleaseClient{
+    .name = "Windows",
     .batched_send_packet = "55 41 57 41 56 41 55 41 54 56 57 53 48 83 EC 78 48 8D 6C 24 70 48 C7 45 00 FE FF FF FF 44 "
                            "89 CB 48 89 D7 48 89 CE 48 83 C1 18 4C 8B 72 10 48 83",
     .packet_read_no_header = "55 41 56 56 57 53 48 81 EC 20 01 00 00 48 8D AC 24 80 00 00 00 0F 29 B5 90 00 00 00 48 "
@@ -96,6 +98,7 @@ constexpr Signatures kReleaseClient{
 };
 
 constexpr Signatures kPreviewClient{
+    .name = "Windows Preview",
     .batched_send_packet = "55 56 57 53 48 81 EC 88 00 00 00 48 8D AC 24 80 00 00 00 48 C7 45 00 FE FF FF FF 44 89 CB "
                            "48 89 D7 48 89 CE 48 83 C1 18 48 8B 42 10 48 83 7A 18 10 72 03",
     .packet_read_no_header = "55 41 56 56 57 53 48 81 EC 20 01 00 00 48 8D AC 24 80 00 00 00 0F 29 B5 90 00 00 00 48 "
@@ -112,6 +115,7 @@ constexpr std::string_view kMouseFeed =
 #else
 
 constexpr Signatures kAndroidClient{
+    .name = "Android x86_64",
     .batched_send_packet = "55 48 89 E5 41 57 41 56 41 55 41 54 53 48 83 EC 48 89 4D 9C 49 89 F6 48 89 FB 64 48 8B 04 "
                            "25 28 00 00 00 48 89 45 D0 48 83 C7 18 44 0F B6 3E 41 F6 C7 01 74 06 4D 8B 66 08 EB 06 45 "
                            "89 FC 41 D1 EC",

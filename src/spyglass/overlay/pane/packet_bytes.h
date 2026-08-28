@@ -2,23 +2,17 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <span>
 #include <string>
 #include <vector>
 
 #include <imgui.h>
 
+#include "spyglass/overlay/bytes.h"
+
 namespace spyglass {
 
-class Capture;
-
-enum class BytesFormat : int {
-    HexDump = 0,
-    HexStream = 1,
-    Text = 2,
-    CArray = 3,
-    Base64 = 4,
-};
+struct Record;
+struct ViewOptions;
 
 struct BytesView {
     std::uint64_t record{0};
@@ -45,8 +39,7 @@ struct BytesView {
     float advance[95]{};
 };
 
-std::string format_bytes(std::span<const std::uint8_t> bytes, std::size_t offset, BytesFormat format);
-
-void draw_packet_bytes(const Capture &capture, BytesView &view, float height);
+void draw_packet_bytes(const Record *record, std::uint64_t number, BytesView &view, const ViewOptions &options,
+                       float height);
 
 }  // namespace spyglass

@@ -14,6 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_subdirectory(third_party)
 
 add_library(spyglass SHARED
+        src/spyglass/core/output.cpp
         src/spyglass/error.cpp
         src/spyglass/filename.cpp
         src/spyglass/hook.cpp
@@ -22,14 +23,21 @@ add_library(spyglass SHARED
         src/spyglass/network.cpp
         src/spyglass/overlay/android/overlay.cpp
         src/spyglass/overlay/android/symbol.cpp
+        src/spyglass/overlay/bytes.cpp
         src/spyglass/overlay/capture.cpp
+        src/spyglass/overlay/export.cpp
         src/spyglass/overlay/filter.cpp
+        src/spyglass/overlay/navigate.cpp
+        src/spyglass/overlay/pane/expert_window.cpp
         src/spyglass/overlay/pane/filter_window.cpp
+        src/spyglass/overlay/pane/menu_bar.cpp
         src/spyglass/overlay/pane/packet_bytes.cpp
         src/spyglass/overlay/pane/packet_details.cpp
         src/spyglass/overlay/pane/packet_list.cpp
+        src/spyglass/overlay/pane/statistics_window.cpp
         src/spyglass/overlay/pane/status_bar.cpp
         src/spyglass/overlay/pane/toolbar.cpp
+        src/spyglass/overlay/report.cpp
         src/spyglass/overlay/view.cpp
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp
@@ -39,6 +47,7 @@ add_library(spyglass SHARED
         src/spyglass/pattern.cpp
         src/spyglass/signature.cpp)
 target_include_directories(spyglass PRIVATE src)
+target_compile_definitions(spyglass PRIVATE SPYGLASS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(spyglass PRIVATE
         nonstd::expected-lite
         funchook-static

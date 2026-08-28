@@ -1,10 +1,10 @@
 #include "spyglass/overlay/pane/packet_bytes.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <iterator>
 #include <optional>
@@ -16,15 +16,11 @@
 #include <imgui.h>
 
 #include "spyglass/overlay/capture.h"
+#include "spyglass/overlay/options.h"
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
 namespace {
-
-constexpr std::size_t kBytesPerRow = 16;
-constexpr std::size_t kGroupSize = kBytesPerRow / 2;
-constexpr std::string_view kHexDigits = "0123456789ABCDEF";
-constexpr std::string_view kBase64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 struct Layout {
     float hex{0.0F};
@@ -124,81 +120,59 @@ void outline(ImDrawList *draw, const BytesView &view, const Layout &layout, cons
     }
 }
 
-}  // namespace
-
-std::string format_bytes(const std::span<const std::uint8_t> bytes, const std::size_t offset,
-                         const BytesFormat format)
+std::string inspect(const std::span<const std::uint8_t> range)
 {
-    std::string text;
+    auto text = std::format("u8 {}", range[0]);
 
-    switch (format) {
-    case BytesFormat::HexDump: {
-        auto digits = 4;
-        for (auto highest = offset + bytes.size(); highest > 0xFFFF; highest >>= 8) {
-            digits += 2;
-        }
-        for (std::size_t row = 0; row < bytes.size(); row += kBytesPerRow) {
-            text += std::format("{:0{}X}  ", offset + row, digits);
-            for (std::size_t i = 0; i < kBytesPerRow; ++i) {
-                if (i == kGroupSize) {
-                    text += ' ';
-                }
-                text += row + i < bytes.size() ? std::format("{:02X} ", bytes[row + i]) : std::string{"   "};
-            }
-            text += ' ';
-            for (std::size_t i = 0; i < kBytesPerRow && row + i < bytes.size(); ++i) {
-                const auto byte = bytes[row + i];
-                text += byte >= 0x20 && byte < 0x7F ? static_cast<char>(byte) : '.';
-            }
-            text += '\n';
-        }
-        break;
+    if (range.size() >= 2) {
+        std::uint16_t value = 0;
+        std::memcpy(&value, range.data(), sizeof(value));
+        text += std::format("  |  u16 {}  i16 {}", value, static_cast<std::int16_t>(value));
     }
-    case BytesFormat::HexStream:
-        for (const auto byte : bytes) {
-            text += std::format("{:02X}", byte);
-        }
-        break;
-    case BytesFormat::Text:
-        for (const auto byte : bytes) {
-            text += byte >= 0x20 && byte < 0x7F ? static_cast<char>(byte) : '.';
-        }
-        break;
-    case BytesFormat::CArray:
-        text = std::format("unsigned char packet[{}] = {{", bytes.size());
-        for (std::size_t i = 0; i < bytes.size(); ++i) {
-            text += i % 12 == 0 ? "\n    " : " ";
-            text += std::format("0x{:02X},", bytes[i]);
-        }
-        text += "\n};\n";
-        break;
-    case BytesFormat::Base64:
-        for (std::size_t i = 0; i < bytes.size(); i += 3) {
-            const auto remaining = bytes.size() - i;
-            const auto triple = (static_cast<std::uint32_t>(bytes[i]) << 16) |
-                                (remaining > 1 ? static_cast<std::uint32_t>(bytes[i + 1]) << 8 : 0U) |
-                                (remaining > 2 ? static_cast<std::uint32_t>(bytes[i + 2]) : 0U);
-            text += kBase64Alphabet[(triple >> 18) & 0x3F];
-            text += kBase64Alphabet[(triple >> 12) & 0x3F];
-            text += remaining > 1 ? kBase64Alphabet[(triple >> 6) & 0x3F] : '=';
-            text += remaining > 2 ? kBase64Alphabet[triple & 0x3F] : '=';
-        }
-        break;
+    if (range.size() >= 4) {
+        std::uint32_t value = 0;
+        float real = 0.0F;
+        std::memcpy(&value, range.data(), sizeof(value));
+        std::memcpy(&real, range.data(), sizeof(real));
+        text += std::format("  |  u32 {}  i32 {}  f32 {:g}", value, static_cast<std::int32_t>(value), real);
+    }
+    if (range.size() >= 8) {
+        std::uint64_t value = 0;
+        double real = 0.0;
+        std::memcpy(&value, range.data(), sizeof(value));
+        std::memcpy(&real, range.data(), sizeof(real));
+        text += std::format("  |  u64 {}  i64 {}  f64 {:g}", value, static_cast<std::int64_t>(value), real);
     }
 
+    std::uint64_t varint = 0;
+    std::size_t read = 0;
+    while (read < range.size() && read < 10) {
+        varint |= static_cast<std::uint64_t>(range[read] & 0x7F) << (7 * read);
+        ++read;
+        if ((range[read - 1] & 0x80) == 0) {
+            break;
+        }
+    }
+    text += std::format("  |  varint {} in {}  zigzag {}", varint, read,
+                        static_cast<std::int64_t>((varint >> 1) ^ (~(varint & 1) + 1)));
+
+    text += "  |  text ";
+    text += format_bytes(range.first(std::min<std::size_t>(range.size(), 32)), 0, BytesFormat::Text);
     return text;
 }
 
-void draw_packet_bytes(const Capture &capture, BytesView &view, const float height)
+}  // namespace
+
+void draw_packet_bytes(const Record *const record, const std::uint64_t number, BytesView &view,
+                       const ViewOptions &options, const float height)
 {
-    const auto record = capture.selected_record();
-    const auto held = record ? record->body : Body{};
+    const auto held = record != nullptr ? record->body : Body{};
     const std::span<const std::uint8_t> body = held ? std::span{*held} : std::span<const std::uint8_t>{};
-    const auto stopped = record && !record->decoded
+    const auto stopped = record != nullptr && !record->decoded
                            ? body.size() - std::min<std::size_t>(record->unread, body.size())
                            : body.size();
 
-    if (const auto number = capture.selected(); number != view.record) {
+    if (number != view.record) {
         view.record = number;
         view.selected = false;
         view.dragging = false;
@@ -206,9 +180,10 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
         view.matches.clear();
         view.match = -1;
         view.query_dirty = true;
-        view.scroll_to_row = record && !record->decoded ? static_cast<long long>(stopped / kBytesPerRow) : 0;
+        view.scroll_to_row =
+            record != nullptr && !record->decoded ? static_cast<long long>(stopped / kBytesPerRow) : 0;
     }
-    if (!record) {
+    if (record == nullptr) {
         view.selected = false;
         view.dragging = false;
         view.hovering = false;
@@ -271,38 +246,7 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
     if (view.query_dirty) {
         const std::string_view query{view.query};
         std::vector<std::uint8_t> needle;
-        bool valid = true;
-
-        if (view.query_hex) {
-            int high = -1;
-            for (std::size_t i = 0; i < query.size(); ++i) {
-                const auto character = query[i];
-                if (character == ' ' || character == ',') {
-                    continue;
-                }
-                if (character == '0' && i + 1 < query.size() && (query[i + 1] == 'x' || query[i + 1] == 'X')) {
-                    ++i;
-                    continue;
-                }
-                const auto digit =
-                    kHexDigits.find(static_cast<char>(std::toupper(static_cast<unsigned char>(character))));
-                if (digit == std::string_view::npos) {
-                    valid = false;
-                    break;
-                }
-                if (high < 0) {
-                    high = static_cast<int>(digit);
-                }
-                else {
-                    needle.push_back(static_cast<std::uint8_t>((high << 4) | digit));
-                    high = -1;
-                }
-            }
-            valid = valid && high < 0;
-        }
-        else {
-            needle.assign(query.begin(), query.end());
-        }
+        const auto valid = parse_needle(query, view.query_hex, needle);
 
         view.matches.clear();
         view.needle = valid ? needle.size() : 0;
@@ -369,9 +313,11 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
     auto first = std::min(view.anchor, view.cursor);
     auto last = std::max(view.anchor, view.cursor);
 
+    const auto inspecting = options.inspector && view.selected && !body.empty();
+    const auto reserved = ImGui::GetFrameHeightWithSpacing() * (inspecting ? 2.0F : 1.0F);
+
     ImGui::SetNextWindowContentSize(ImVec2{layout.width, 0.0F});
-    ImGui::BeginChild("bytes", ImVec2{-1.0F, std::max(0.0F, height - ImGui::GetFrameHeightWithSpacing())},
-                      ImGuiChildFlags_Borders,
+    ImGui::BeginChild("bytes", ImVec2{-1.0F, std::max(0.0F, height - reserved)}, ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{0.0F, 0.0F});
 
@@ -549,6 +495,10 @@ void draw_packet_bytes(const Capture &capture, BytesView &view, const float heig
 
     ImGui::PopStyleVar();
     ImGui::EndChild();
+
+    if (inspecting) {
+        ImGui::TextColored(kMuted, "%s", inspect(body.subspan(first, last - first + 1)).c_str());
+    }
 
     if (open_text) {
         ImGui::OpenPopup("bytes_text");

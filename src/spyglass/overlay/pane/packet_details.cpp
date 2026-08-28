@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include "spyglass/overlay/capture.h"
+#include "spyglass/overlay/options.h"
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
@@ -15,33 +16,44 @@ constexpr auto kBranch = ImGuiTreeNodeFlags_SpanAvailWidth;
 constexpr auto kLeaf =
     ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
 
-void draw_node(const Node &node, const int index)
+void set_open(const ViewOptions &options)
+{
+    if (options.expand_details || options.collapse_details) {
+        ImGui::SetNextItemOpen(options.expand_details, ImGuiCond_Always);
+    }
+}
+
+void draw_node(const ViewOptions &options, const Node &node, const int index)
 {
     ImGui::PushID(index);
     if (node.children.empty()) {
         ImGui::TreeNodeEx("node", kLeaf, "%s", node.label.c_str());
     }
-    else if (ImGui::TreeNodeEx("node", kBranch, "%s", node.label.c_str())) {
-        int child = 0;
-        for (const auto &branch : node.children) {
-            draw_node(branch, child++);
+    else {
+        set_open(options);
+        if (ImGui::TreeNodeEx("node", kBranch, "%s", node.label.c_str())) {
+            int child = 0;
+            for (const auto &branch : node.children) {
+                draw_node(options, branch, child++);
+            }
+            ImGui::TreePop();
         }
-        ImGui::TreePop();
     }
     ImGui::PopID();
 }
 
 }  // namespace
 
-void draw_packet_details(const Capture &capture, const float height)
+void draw_packet_details(const Record *const record, ViewOptions &options, const float height)
 {
     ImGui::BeginChild("details", ImVec2{-1.0F, height}, ImGuiChildFlags_Borders);
 
-    if (const auto record = capture.selected_record()) {
+    if (record != nullptr) {
         const auto number = static_cast<unsigned long long>(record->number);
         const std::size_t length = record->body ? record->body->size() : 0;
         const bool outbound = record->direction == Direction::Outbound;
 
+        set_open(options);
         if (ImGui::TreeNodeEx("frame", kBranch, "Frame %llu: %zu bytes captured at %.6f", number, length,
                               record->time)) {
             ImGui::TreeNodeEx("number", kLeaf, "Number: %llu", number);
@@ -50,6 +62,7 @@ void draw_packet_details(const Capture &capture, const float height)
             ImGui::TreePop();
         }
 
+        set_open(options);
         if (ImGui::TreeNodeEx("packet", kBranch, "Minecraft Bedrock: %s",
                               record->name.empty() ? "unnamed" : record->name.c_str())) {
             ImGui::TreeNodeEx("id", kLeaf, "Id: %d", record->id);
@@ -63,8 +76,9 @@ void draw_packet_details(const Capture &capture, const float height)
             const auto stopped = length - std::min<std::size_t>(record->unread, length);
             ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
             ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+            set_open(options);
             if (ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped)) {
-                draw_node(*record->error, 0);
+                draw_node(options, *record->error, 0);
                 ImGui::TreePop();
             }
             ImGui::PopStyleColor();

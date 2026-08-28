@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -42,6 +43,32 @@ struct Visited {
     std::uint64_t next{0};
 };
 
+constexpr std::size_t kLengthBuckets = 10;
+
+struct Rate {
+    std::uint64_t packets{0};
+    std::size_t bytes{0};
+};
+
+struct Statistics {
+    std::uint64_t total{0};
+    std::uint64_t bad{0};
+    std::uint64_t inbound{0};
+    std::uint64_t outbound{0};
+    std::size_t inbound_bytes{0};
+    std::size_t outbound_bytes{0};
+    std::size_t retained{0};
+    std::size_t retained_bytes{0};
+    std::uint64_t oldest{0};
+    std::uint64_t newest{0};
+    double duration{0.0};
+    double wall_start{0.0};
+    std::vector<std::uint64_t> counts;
+    std::vector<std::size_t> byte_counts;
+    std::array<std::uint64_t, kLengthBuckets> lengths{};
+    std::vector<Rate> rates;
+};
+
 class Capture {
 public:
     void record(Record record);
@@ -63,10 +90,12 @@ public:
     }
 
     [[nodiscard]] std::uint64_t total() const;
+    [[nodiscard]] double wall_start() const;
     [[nodiscard]] Record at_number(std::uint64_t number) const;
     [[nodiscard]] std::optional<Record> selected_record() const;
     [[nodiscard]] std::uint64_t bad() const;
     [[nodiscard]] std::vector<std::uint64_t> counts() const;
+    [[nodiscard]] Statistics statistics() const;
 
     [[nodiscard]] std::uint64_t selected() const;
     void select(std::uint64_t number);
@@ -82,10 +111,18 @@ private:
     mutable std::mutex mutex_;
     std::deque<Record> records_;
     std::vector<std::uint64_t> counts_;
+    std::vector<std::size_t> id_bytes_;
+    std::array<std::uint64_t, kLengthBuckets> lengths_{};
+    std::vector<Rate> rates_;
     std::uint64_t counter_{0};
     std::uint64_t bad_{0};
+    std::uint64_t inbound_{0};
+    std::uint64_t outbound_{0};
+    std::size_t inbound_bytes_{0};
+    std::size_t outbound_bytes_{0};
     std::size_t bytes_{0};
     double started_{-1.0};
+    double wall_started_{0.0};
     std::uint64_t selected_{0};
     bool running_{true};
 };

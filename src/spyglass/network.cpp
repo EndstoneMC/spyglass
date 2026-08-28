@@ -27,6 +27,7 @@ namespace {
 void *g_send_packet = nullptr;
 void *g_read_no_header = nullptr;
 void *g_create_packet = nullptr;
+spyglass::Hooks g_hooks;
 
 constexpr bool kBreakFirstSubChunk = false;
 constexpr int kSubChunkPacket = 174;
@@ -138,10 +139,18 @@ void install_network_hook()
 {
     const auto &signature = signatures();
     g_create_packet = find(signature.create_packet);
-    static FunctionHook send{"BatchedNetworkPeer::sendPacket", find(signature.batched_send_packet),
+    g_hooks.create_packet = g_create_packet;
+    g_hooks.send_packet = find(signature.batched_send_packet);
+    g_hooks.read_no_header = find(signature.packet_read_no_header);
+    static FunctionHook send{"BatchedNetworkPeer::sendPacket", g_hooks.send_packet,
                              detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
-    static FunctionHook read{"Packet::readNoHeader", find(signature.packet_read_no_header),
+    static FunctionHook read{"Packet::readNoHeader", g_hooks.read_no_header,
                              detail::fp_cast(&Packet::readNoHeader), &g_read_no_header};
+}
+
+const Hooks &hooks()
+{
+    return g_hooks;
 }
 
 const std::vector<std::string> &packet_names()

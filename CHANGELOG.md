@@ -17,6 +17,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Right-clicking a packet in the list hides that packet, shows only it, or copies the row.
 - The status bar says how many packets are being shown while a filter is on, and the toolbar button
   carries a mark so a filtered list is never mistaken for a stalled capture.
+- A menu bar above the capture buttons, holding everything below. Nothing is bound to a key: every
+  action is a menu item or an entry on a right-click menu.
+- `Go` jumps the list to places the mouse cannot reach on its own: a packet by number, the first or
+  last packet, the next or previous failed decode, and the next or previous packet of the same kind
+  as the selected one. `Back` and `Forward` retrace the packets you have looked at, and `Auto Scroll`
+  pins the list to the newest packet instead of leaving it to the scroll position.
+- `View` hides either of the lower two panes, expands or collapses the whole details tree, turns the
+  colouring of failed packets off, resizes the columns to their contents, and zooms the panes in and
+  out for a display the 11 pixel font is too small for.
+- `View` also chooses what the `Time` column means: seconds since the first packet, since the
+  previous captured packet, since the previous displayed packet, or the time of day. A delta column
+  is what makes a stall visible. `Edit` can make any packet the zero of that clock, and the row it is
+  set on reads `*REF*`.
+- `Edit` finds a packet by name, by id, or by hex or text in its body, from a bar above the list.
+- `Edit` marks packets so they keep their place in a list scrolling past at speed, and `Go` moves
+  between the marks.
+- `Edit` copies the selected row, the whole details tree, or every displayed row as text or CSV.
+- `File` writes the same things to a file under `%LOCALAPPDATA%\spyglass` (`~/.local/share/spyglass`
+  on the Linux launcher): the displayed packets as text or CSV, the selected packet's details or
+  bytes, and a summary of the session. There is no file picker inside the client, so the name is
+  generated and the menu says where the file landed.
+- `Analyze` opens the expert information window, which groups every failed decode by the reason the
+  client gave and the packet it was reading, counts them, and jumps to the first of a group when you
+  click it. It also turns on a readout under the hex view that reads the selected bytes as an
+  integer, a float, a varint and text.
+- `Statistics` reports the session: what was captured and retained, a breakdown per packet id with
+  its share of the bytes, the distribution of packet lengths, and a graph of packets or bytes per
+  second.
+- `View` opens the selected packet in a window of its own, so two packets of the same kind can be
+  read side by side.
+- `Help` says which client build was detected, which pattern set was chosen and where the hooks
+  landed, which is what a bug report needs. The errors window moved under it.
 
 ### Fixed
 

@@ -53,11 +53,29 @@ mistaken for a stalled capture.
 `Start`, `Stop` and `Restart` control the capture. The status bar carries the totals, the share that failed, and the
 extent of the selection.
 
+**The menu bar** above them holds the rest, and nothing is bound to a key: every action is a menu item, or an entry
+on the right-click menu of the row it applies to.
+
+`Go` jumps the list where the mouse cannot: a packet by number, the first or last, the next failed decode, the next
+packet of the same kind as the selected one, or back and forward through the packets you have looked at. `Edit`
+finds a packet by name, by id, or by hex or text in its body, marks packets so they keep their place, and makes any
+packet the zero of the clock. `View` hides panes, zooms, expands the details tree, opens a packet in a window of its
+own, and chooses what the `Time` column means — seconds since the first packet, since the previous one, or the time
+of day. A delta column is what makes a stall visible.
+
+`Analyze` opens the expert information window, which groups every failed decode by the reason the client gave and
+the packet it was reading, and jumps to one when you click it. It also reads the selected bytes out as an integer, a
+float, a varint and text. `Statistics` reports what the session captured, a breakdown per packet id with its share
+of the bytes, the distribution of packet lengths, and a graph of packets or bytes per second.
+
 Sent packets are captured as well as received ones, so a request and the answer to it sit in the same list. Spyglass
 holds the last 64 MB of bodies and drops the oldest beyond that, which is far more of a session than the packets
 worth scrolling back through, and bounds a resource pack download arriving inside the client's own address space.
 
-Nothing is written to disk. The capture lives in the overlay and goes with the client when it closes.
+The capture lives in the overlay and goes with the client when it closes. `File` writes what you ask it to under
+`%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher: the displayed packets as text or CSV,
+the selected packet's details or bytes, and a summary of the session. There is no file picker inside the client, so
+the name is generated and the menu says where the file landed.
 
 ## Quick Start
 
@@ -168,8 +186,8 @@ connected, that window is where the reason is.
 - Resolving the launcher's ImGui needs its symbols, so a stripped launcher gets no overlay.
 - A client update that adds a source file renders its call stack frames as `<hash>:line` until a line for it is
   added to the filename table.
-- The capture contains packet contents from whatever server you are connected to. Nothing is sanitised, so be
-  careful what you share out of it.
+- The capture contains packet contents from whatever server you are connected to, including whatever you logged in
+  with. Nothing is sanitised, and an export writes it to disk in the clear, so read a file before you share it.
 
 ## License
 
