@@ -1,10 +1,16 @@
 #include "spyglass/network.h"
 
-#include <atomic>
+#include <algorithm>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
+#include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/network/batched_network_peer.h"
+#include "bedrock/network/packet.h"
 #include "spyglass/detail.h"
 #include "spyglass/hook.h"
 #include "spyglass/overlay/view.h"
@@ -13,55 +19,60 @@
 
 namespace {
 
-std::atomic_uint64_t g_sent{0};
-std::atomic_uint64_t g_received{0};
-
 void *g_send_packet = nullptr;
-void *g_receive_packet = nullptr;
+void *g_read_no_header = nullptr;
+
+spyglass::Body body_of(const std::string_view data)
+{
+    return std::make_shared<const std::vector<std::uint8_t>>(data.begin(), data.end());
+}
 
 }  // namespace
 
 void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::Reliability reliability,
                                     const Compressibility compressible)
 {
-    g_sent.fetch_add(1, std::memory_order_relaxed);
-    spyglass::View::getInstance().onPacketSend(data);
+    ReadOnlyBinaryStream stream{data, false};
+    const auto header = stream.getUnsignedVarInt();
+
+    spyglass::View::getInstance().onPacketSend({
+        .id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1,
+        .decoded = header.asExpected().has_value(),
+        .body = body_of(data),
+    });
     SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::sendPacket, g_send_packet, this, data, reliability, compressible);
 }
 
-NetworkPeer::DataStatus BatchedNetworkPeer::_receivePacket(
-    std::string &out_data, const NetworkPeer::PacketRecvTimepointPtr &timepoint_ptr)
+Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &reflection_ctx,
+                                           const SubClientId &sub_id)
 {
-    const auto status =
-        SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::_receivePacket, g_receive_packet, this, out_data, timepoint_ptr);
-    if (status == NetworkPeer::DataStatus::HasData) {
-        g_received.fetch_add(1, std::memory_order_relaxed);
-        spyglass::View::getInstance().onPacketReceive(out_data);
-    }
-    return status;
+    const auto begin = stream.getReadPointer();
+    auto result = SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, this, stream, reflection_ctx, sub_id);
+
+    const auto view = stream.getView();
+    const auto end = std::min(stream.getReadPointer(), view.size());
+
+    spyglass::View::getInstance().onPacketReceive({
+        .id = static_cast<int>(getId()),
+        .name = std::string{getName()},
+        .decoded = result.asExpected().has_value(),
+        .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
+        .body = body_of(begin < end ? view.substr(begin, end - begin) : std::string_view{}),
+    });
+    return result;
 }
 
 namespace spyglass {
 
-std::uint64_t packets_sent()
-{
-    return g_sent.load(std::memory_order_relaxed);
-}
-
-std::uint64_t packets_received()
-{
-    return g_received.load(std::memory_order_relaxed);
-}
-
 void install_network_hook()
 {
-    if (kBatchedSendPacket.empty() || kBatchedReceivePacket.empty()) {
-        throw std::runtime_error{"no BatchedNetworkPeer patterns for this platform"};
+    if (kBatchedSendPacket.empty() || kPacketReadNoHeader.empty()) {
+        throw std::runtime_error{"no packet patterns for this platform"};
     }
     static FunctionHook send{"BatchedNetworkPeer::sendPacket", find(kBatchedSendPacket),
                              detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
-    static FunctionHook receive{"BatchedNetworkPeer::_receivePacket", find(kBatchedReceivePacket),
-                                detail::fp_cast(&BatchedNetworkPeer::_receivePacket), &g_receive_packet};
+    static FunctionHook read{"Packet::readNoHeader", find(kPacketReadNoHeader),
+                             detail::fp_cast(&Packet::readNoHeader), &g_read_no_header};
 }
 
 }  // namespace spyglass

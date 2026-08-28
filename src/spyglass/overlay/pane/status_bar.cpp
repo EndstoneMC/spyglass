@@ -9,7 +9,7 @@ namespace spyglass {
 
 void draw_status_bar(const Capture &capture)
 {
-    const auto total = capture.packets().size();
+    const auto total = capture.size();
     const auto bad = capture.bad();
     const double share = total == 0 ? 0.0 : (100.0 * static_cast<double>(bad)) / static_cast<double>(total);
 

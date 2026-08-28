@@ -1,6 +1,7 @@
 #include "spyglass/overlay/view.h"
 
 #include <algorithm>
+#include <utility>
 
 #include <imgui.h>
 
@@ -40,14 +41,16 @@ View &View::getInstance()
     return view;
 }
 
-void View::onPacketSend(const std::string_view data)
+void View::onPacketSend(Record record)
 {
-    capture_.record(Direction::Outbound, data);
+    record.direction = Direction::Outbound;
+    capture_.record(std::move(record));
 }
 
-void View::onPacketReceive(const std::string_view data)
+void View::onPacketReceive(Record record)
 {
-    capture_.record(Direction::Inbound, data);
+    record.direction = Direction::Inbound;
+    capture_.record(std::move(record));
 }
 
 void View::draw()

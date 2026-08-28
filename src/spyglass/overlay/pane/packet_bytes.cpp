@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <span>
 
 #include <imgui.h>
 
@@ -20,7 +22,8 @@ void draw_packet_bytes(const Capture &capture, const float height)
     constexpr auto flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
     constexpr int columns = 3 + (2 * static_cast<int>(kBytesPerRow));
 
-    const auto body = capture.selected_body();
+    const auto held = capture.selected_body();
+    const std::span<const std::uint8_t> body = held ? std::span{*held} : std::span<const std::uint8_t>{};
     if (!ImGui::BeginTable("bytes", columns, flags, ImVec2{-1.0F, height})) {
         return;
     }

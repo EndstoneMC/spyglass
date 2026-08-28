@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string_view>
-
 #include "spyglass/overlay/capture.h"
 
 namespace spyglass {
@@ -12,8 +10,8 @@ public:
 
     void draw();
 
-    void onPacketSend(std::string_view data);
-    void onPacketReceive(std::string_view data);
+    void onPacketSend(Record record);
+    void onPacketReceive(Record record);
 
     void toggle() noexcept { visible_ = !visible_; }
     [[nodiscard]] bool visible() const noexcept { return visible_; }

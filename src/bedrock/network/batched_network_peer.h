@@ -18,19 +18,9 @@
 
 #include "bedrock/network/network_peer.h"
 
-namespace spyglass {
-void install_network_hook();
-}  // namespace spyglass
-
 // Deliberately not derived from NetworkPeer: taking &BatchedNetworkPeer::sendPacket on a virtual
 // member yields a vcall thunk, and hooking that dispatches straight back through the vtable.
 class BatchedNetworkPeer {
 public:
     void sendPacket(const std::string &data, NetworkPeer::Reliability reliability, Compressibility compressible);
-
-private:
-    NetworkPeer::DataStatus _receivePacket(std::string &out_data,
-                                           const NetworkPeer::PacketRecvTimepointPtr &timepoint_ptr);
-
-    friend void spyglass::install_network_hook();
 };
