@@ -42,7 +42,7 @@ half, search the body for hex or text with `F3` and `Ctrl+F`, and copy what you 
 stream, printable text, a C array or base64. `Show text...` puts the same output in a box to read instead of on the
 clipboard.
 
-**The filter** window, opened with `Display filter` on the toolbar, decides what the list shows. It holds every packet the
+**The filter** window, opened with `Filter` on the toolbar, decides what the list shows. It holds every packet the
 client knows, by id, each with a tick box and the number of them the session has seen. Untick what you do not want.
 The find box narrows the window's own list, and `All`, `None` and `Invert` act on what it is showing, so typing
 `chunk` and pressing `None` hides every chunk packet in one go. `Failed decodes only` and the two direction boxes
@@ -71,10 +71,8 @@ of the bytes, the distribution of packet lengths, and a graph of packets or byte
 Sent packets are captured as well as received ones, so a request and the answer to it sit in the same list. Spyglass
 holds the last 64 MB of bodies and drops the oldest beyond that, which is far more of a session than the packets
 worth scrolling back through, and bounds a resource pack download arriving inside the client's own address space.
-`Capture` sets those limits, and holds a second filter of the same shape as the first: the display filter hides
-packets, the capture filter never records them, so a chunk flood stops spending the budget on packets you did not
-want. The two toolbar buttons mark themselves in different colours, and the status bar counts what was dropped,
-because a capture missing packets and a list hiding them are different problems.
+`Capture ▸ Options` sets those limits, and turns off capturing sent packets when only the server's half of the
+conversation is in question.
 
 The capture lives in the overlay and goes with the client when it closes. `File` writes what you ask it to under
 `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher: the displayed packets as text or CSV,

@@ -15,11 +15,10 @@
 
 namespace spyglass {
 
-void draw_filter_window(const char *const title, const Capture &capture, Filter &filter, FilterWindow &window,
-                        bool &open)
+void draw_filter_window(const Capture &capture, Filter &filter, FilterWindow &window, bool &open)
 {
     ImGui::SetNextWindowSize(ImVec2{420.0F, 520.0F}, ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin(title, &open)) {
+    if (!ImGui::Begin("Spyglass: filter", &open)) {
         ImGui::End();
         return;
     }

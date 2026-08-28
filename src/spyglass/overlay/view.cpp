@@ -72,19 +72,12 @@ void View::draw()
         ImGui::End();
     }
 
-    capture_.set_capture_filter(capture_filter_);
-
     if (options_.filter_window && interactive_) {
-        draw_filter_window("Spyglass: display filter", capture_, filter_, filter_window_, options_.filter_window);
-    }
-
-    if (options_.capture_filter_window && interactive_) {
-        draw_filter_window("Spyglass: capture filter", capture_, capture_filter_, capture_filter_window_,
-                           options_.capture_filter_window);
+        draw_filter_window(capture_, filter_, filter_window_, options_.filter_window);
     }
 
     if (options_.capture_options_window) {
-        draw_capture_options(capture_, capture_filter_, options_.capture_options_window);
+        draw_capture_options(capture_, options_.capture_options_window);
     }
 
     if (options_.about_window) {
@@ -102,7 +95,7 @@ void View::draw()
     ImGui::SetNextWindowSize(ImVec2{960.0F, 720.0F}, ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Spyglass", &visible_, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
         draw_menu_bar(capture_, filter_, list_, options_);
-        draw_toolbar(capture_, filter_, capture_filter_, options_.filter_window, options_.capture_filter_window);
+        draw_toolbar(capture_, filter_, options_.filter_window);
         if (options_.find_bar) {
             draw_find_bar(capture_, filter_, list_, options_);
         }

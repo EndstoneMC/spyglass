@@ -35,7 +35,6 @@ public:
 private:
     Capture capture_;
     Filter filter_;
-    Filter capture_filter_;
     ViewOptions options_;
     bool visible_{true};
     bool interactive_{true};
@@ -43,7 +42,6 @@ private:
     float details_share_{0.30F};
     PacketList list_;
     FilterWindow filter_window_;
-    FilterWindow capture_filter_window_;
     ExpertWindow expert_window_;
     BytesView bytes_view_;
     std::vector<DetachedPacket> detached_;

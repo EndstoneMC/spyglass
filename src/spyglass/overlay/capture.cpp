@@ -26,7 +26,7 @@ void Capture::record(Record record)
     if (!running_) {
         return;
     }
-    if (!capture_filter_.matches(record)) {
+    if (!options_.outbound && record.direction == Direction::Outbound) {
         ++rejected_;
         return;
     }
@@ -81,7 +81,7 @@ void Capture::record(Record record)
 
 void Capture::trim()
 {
-    while (records_.size() > retention_.records || (bytes_ > retention_.bytes && records_.size() > 1)) {
+    while (records_.size() > options_.records || (bytes_ > options_.bytes && records_.size() > 1)) {
         bytes_ -= records_.front().body ? records_.front().body->size() : 0;
         records_.pop_front();
     }
@@ -217,32 +217,20 @@ void Capture::restart()
     running_ = true;
 }
 
-Retention Capture::retention() const
+CaptureOptions Capture::options() const
 {
     const std::lock_guard lock{mutex_};
-    return retention_;
+    return options_;
 }
 
-void Capture::set_retention(const Retention retention)
+void Capture::set_options(const CaptureOptions &options)
 {
     const std::lock_guard lock{mutex_};
-    if (retention_ == retention) {
+    if (options_ == options) {
         return;
     }
-    retention_ = retention;
+    options_ = options;
     trim();
-}
-
-Filter Capture::capture_filter() const
-{
-    const std::lock_guard lock{mutex_};
-    return capture_filter_;
-}
-
-void Capture::set_capture_filter(const Filter &filter)
-{
-    const std::lock_guard lock{mutex_};
-    capture_filter_ = filter;
 }
 
 }  // namespace spyglass

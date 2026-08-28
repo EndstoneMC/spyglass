@@ -49,17 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read side by side.
 - `Help` says which client build was detected, which pattern set was chosen and where the hooks
   landed, which is what a bug report needs. The errors window moved under it.
-- A capture filter, under `Capture`. It is the same window as the display filter, but it drops
-  packets at the hook rather than hiding them in the list, so a chunk flood no longer spends the
-  retention budget on packets you did not want. The status bar counts what it dropped.
 - `Capture` ▸ `Options` sets how much the capture keeps. The 65536 packet and 64 MB limits were
-  fixed; they are now yours to move.
-
-### Changed
-
-- The toolbar's `Filter` button is now two: `Capture filter` and `Display filter`. They mark
-  themselves in different colours, because a capture missing packets and a list hiding them are
-  different problems.
+  fixed; they are now yours to move. It also turns off capturing sent packets, which halves what a
+  session costs when only the server's half is in question. The status bar counts what was left out.
 
 ### Fixed
 

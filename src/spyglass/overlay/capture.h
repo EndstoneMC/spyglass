@@ -11,8 +11,6 @@
 #include <string>
 #include <vector>
 
-#include "spyglass/overlay/filter.h"
-
 namespace spyglass {
 
 enum class Direction : int {
@@ -47,11 +45,12 @@ struct Visited {
 
 constexpr std::size_t kLengthBuckets = 10;
 
-struct Retention {
+struct CaptureOptions {
     std::size_t records{65536};
     std::size_t bytes{64 * 1024 * 1024};
+    bool outbound{true};
 
-    bool operator==(const Retention &other) const = default;
+    bool operator==(const CaptureOptions &other) const = default;
 };
 
 struct Rate {
@@ -115,10 +114,8 @@ public:
     void stop();
     void restart();
 
-    [[nodiscard]] Retention retention() const;
-    void set_retention(Retention retention);
-    [[nodiscard]] Filter capture_filter() const;
-    void set_capture_filter(const Filter &filter);
+    [[nodiscard]] CaptureOptions options() const;
+    void set_options(const CaptureOptions &options);
 
 private:
     [[nodiscard]] const Record *find(std::uint64_t number) const;
@@ -141,8 +138,7 @@ private:
     double started_{-1.0};
     double wall_started_{0.0};
     std::uint64_t selected_{0};
-    Retention retention_;
-    Filter capture_filter_;
+    CaptureOptions options_;
     bool running_{true};
 };
 
