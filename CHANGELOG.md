@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Selecting a packet and expanding it shows the fields it decoded to. The names, values, enum names
   and nested structure come from the client's own cereal reflection, so they are whatever the client
   itself read, not a second implementation of the protocol that can disagree with it. A packet the
-  client failed to read still shows the fields it managed before it stopped.
+  client failed to read still shows the fields it managed before it stopped. Identifiers read as
+  ordinary UUIDs, item stacks and recipes as the fields they are sent as, and a field holding NBT
+  says how many entries the tag has. A wrapper holding a single value is shown as that value rather
+  than as a branch to open.
 - A filter for the packet list, opened with `Filter` on the toolbar. It lists every packet the client
   knows, by id, each with a tick box and the number of them seen so far. Untick the ones you do not
   want in the list. The find box narrows what the window itself shows, and `All`, `None` and `Invert`
