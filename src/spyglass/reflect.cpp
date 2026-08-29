@@ -397,6 +397,24 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
     }
 
     if (type.is_class()) {
+        const auto bases = type.base();
+        const auto members = type.data();
+        auto member = members.begin();
+        if (bases.begin() == bases.end() && member != members.end()) {
+            const auto only = member->second;
+            const cereal::internal::BasicSchema::MemberDescriptor *descriptor = only.custom();
+            if (++member == members.end() && (descriptor == nullptr || descriptor->mDynamicSetterArgCtor == nullptr)) {
+                if (auto wrapped = only.get(value); wrapped) {
+                    std::string inner = descriptor != nullptr ? descriptor->mName : std::string{};
+                    if (inner.empty()) {
+                        inner = std::string{only.name()};
+                    }
+                    append(parent, std::move(wrapped), name.empty() ? std::move(inner) : std::move(name), depth + 1);
+                    return;
+                }
+            }
+        }
+
         Node node{.label = name};
         append_members(node, value, depth);
         if (node.children.empty()) {
