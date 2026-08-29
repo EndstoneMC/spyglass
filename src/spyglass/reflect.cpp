@@ -42,6 +42,19 @@ constexpr std::size_t kMaxBytes = 16;
 
 int g_nodes = 0;
 
+template <template <typename...> class T>
+bool is_specialization(const entt::meta_type &type)
+{
+    const auto *context = reflection_ctx();
+    return context != nullptr && type.is_template_specialization() &&
+           type.template_type() == entt::resolve<entt::meta_class_template_tag<T>>(context->internal().mMetaCtx);
+}
+
+const unsigned char *bytes_of(const entt::meta_any &value)
+{
+    return static_cast<const unsigned char *>(value.base().data());
+}
+
 std::string blob_or_text(const std::string_view raw, const std::size_t total)
 {
     const auto sampled = std::min<std::size_t>(raw.size(), kMaxText);
@@ -324,66 +337,61 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         return;
     }
 
-    if (const auto *context = reflection_ctx(); context != nullptr && type.is_template_specialization()) {
-        const auto &meta_ctx = context->internal().mMetaCtx;
-        const auto tpl = type.template_type();
+    if (is_specialization<std::optional>(type)) {
+        const auto contained = type.template_arity() == 1 ? type.template_arg(0) : entt::meta_type{};
+        const auto *bytes = bytes_of(value);
+        if (bytes != nullptr && contained && contained.size_of() > 0 && contained.size_of() < type.size_of()) {
+            if (bytes[contained.size_of()] == 0) {
+                parent.children.push_back({.label = std::format("{}: (none)", name)});
+            }
+            else {
+                append(parent, contained.from_void(bytes), std::move(name), depth + 1);
+            }
+            return;
+        }
+    }
 
-        if (tpl == entt::resolve<entt::meta_class_template_tag<std::optional>>(meta_ctx)) {
-            const auto contained = type.template_arity() == 1 ? type.template_arg(0) : entt::meta_type{};
-            const auto *bytes = static_cast<const unsigned char *>(value.base().data());
-            if (bytes != nullptr && contained && contained.size_of() > 0 && contained.size_of() < type.size_of()) {
-                if (bytes[contained.size_of()] == 0) {
-                    parent.children.push_back({.label = std::format("{}: (none)", name)});
+    if (is_specialization<std::vector>(type)) {
+        const auto element = type.template_arity() >= 1 ? type.template_arg(0) : entt::meta_type{};
+        const auto *const *range = reinterpret_cast<const unsigned char *const *>(bytes_of(value));
+        if (range != nullptr && element && element.size_of() > 0 && type.size_of() == 3 * sizeof(void *)) {
+            const auto *first = range[0];
+            const auto *last = range[1];
+            if (first != nullptr && last >= first &&
+                static_cast<std::size_t>(last - first) % element.size_of() == 0) {
+                const auto count = static_cast<std::size_t>(last - first) / element.size_of();
+                Node node{.label = std::format("{} [{}]", name, count)};
+                for (std::size_t i = 0; i < std::min(count, kMaxElements); ++i) {
+                    append(node, element.from_void(first + (i * element.size_of())), std::format("[{}]", i),
+                           depth + 1);
                 }
-                else {
-                    append(parent, contained.from_void(bytes), std::move(name), depth + 1);
+                if (count > kMaxElements) {
+                    node.children.push_back({.label = "..."});
                 }
+                parent.children.push_back(std::move(node));
                 return;
             }
         }
+    }
 
-        if (tpl == entt::resolve<entt::meta_class_template_tag<std::vector>>(meta_ctx)) {
-            const auto element = type.template_arity() >= 1 ? type.template_arg(0) : entt::meta_type{};
-            const auto *const *range = static_cast<const unsigned char *const *>(value.base().data());
-            if (range != nullptr && element && element.size_of() > 0 && type.size_of() == 3 * sizeof(void *)) {
-                const auto *first = range[0];
-                const auto *last = range[1];
-                if (first != nullptr && last >= first &&
-                    static_cast<std::size_t>(last - first) % element.size_of() == 0) {
-                    const auto count = static_cast<std::size_t>(last - first) / element.size_of();
-                    Node node{.label = std::format("{} [{}]", name, count)};
-                    for (std::size_t i = 0; i < std::min(count, kMaxElements); ++i) {
-                        append(node, element.from_void(first + (i * element.size_of())), std::format("[{}]", i),
-                               depth + 1);
-                    }
-                    if (count > kMaxElements) {
-                        node.children.push_back({.label = "..."});
-                    }
-                    parent.children.push_back(std::move(node));
-                    return;
-                }
+    if (is_specialization<std::variant>(type)) {
+        const auto arity = type.template_arity();
+        std::size_t storage = 0;
+        for (std::size_t i = 0; i < arity; ++i) {
+            if (const auto alternative = type.template_arg(i)) {
+                storage = std::max(storage, alternative.size_of());
             }
         }
 
-        if (tpl == entt::resolve<entt::meta_class_template_tag<std::variant>>(meta_ctx)) {
-            const auto arity = type.template_arity();
-            std::size_t storage = 0;
-            for (std::size_t i = 0; i < arity; ++i) {
-                if (const auto alternative = type.template_arg(i)) {
-                    storage = std::max(storage, alternative.size_of());
-                }
-            }
-
-            const auto *bytes = static_cast<const unsigned char *>(value.base().data());
-            if (bytes != nullptr && storage > 0 && storage < type.size_of()) {
-                const std::size_t index = bytes[storage];
-                if (const auto alternative = index < arity ? type.template_arg(index) : entt::meta_type{}) {
-                    auto active = alternative.from_void(bytes);
-                    Node node{.label = std::format("{}: {}", name, alternative.info().name())};
-                    append_members(node, active, depth + 1);
-                    parent.children.push_back(std::move(node));
-                    return;
-                }
+        const auto *bytes = bytes_of(value);
+        if (bytes != nullptr && storage > 0 && storage < type.size_of()) {
+            const std::size_t index = bytes[storage];
+            if (const auto alternative = index < arity ? type.template_arg(index) : entt::meta_type{}) {
+                auto active = alternative.from_void(bytes);
+                Node node{.label = std::format("{}: {}", name, alternative.info().name())};
+                append_members(node, active, depth + 1);
+                parent.children.push_back(std::move(node));
+                return;
             }
         }
     }
