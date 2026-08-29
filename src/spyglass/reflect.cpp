@@ -249,25 +249,25 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
 
     switch (type) {
     case Tag::Type::End:
-        parent.children.push_back({.label = std::format("ED {}", name)});
+        parent.children.push_back({.label = std::format("{}", name)});
         return;
     case Tag::Type::Byte:
-        parent.children.push_back({.label = std::format("BY {}: {}", name, static_cast<const ByteTag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const ByteTag &>(tag).data)});
         return;
     case Tag::Type::Short:
-        parent.children.push_back({.label = std::format("SH {}: {}", name, static_cast<const ShortTag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const ShortTag &>(tag).data)});
         return;
     case Tag::Type::Int:
-        parent.children.push_back({.label = std::format("IN {}: {}", name, static_cast<const IntTag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const IntTag &>(tag).data)});
         return;
     case Tag::Type::Int64:
-        parent.children.push_back({.label = std::format("LO {}: {}", name, static_cast<const Int64Tag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const Int64Tag &>(tag).data)});
         return;
     case Tag::Type::Float:
-        parent.children.push_back({.label = std::format("FL {}: {}", name, static_cast<const FloatTag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const FloatTag &>(tag).data)});
         return;
     case Tag::Type::Double:
-        parent.children.push_back({.label = std::format("DO {}: {}", name, static_cast<const DoubleTag &>(tag).data)});
+        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const DoubleTag &>(tag).data)});
         return;
     case Tag::Type::ByteArray: {
         const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
@@ -275,18 +275,18 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         const std::string_view raw =
             bytes != nullptr ? std::string_view{bytes, std::min<std::size_t>(data.size(), kMaxText)}
                              : std::string_view{};
-        parent.children.push_back({.label = std::format("BA {}: {}", name, blob_or_text(raw, data.size()))});
+        parent.children.push_back({.label = std::format("{}: {}", name, blob_or_text(raw, data.size()))});
         return;
     }
     case Tag::Type::String: {
         const auto &data = static_cast<const StringTag &>(tag).data;
-        parent.children.push_back({.label = std::format("ST {}: {}", name, blob_or_text(data, data.size()))});
+        parent.children.push_back({.label = std::format("{}: {}", name, blob_or_text(data, data.size()))});
         return;
     }
     case Tag::Type::List: {
         const auto &list = static_cast<const ListTag &>(tag);
         const auto shown = list.mList.data() != nullptr ? std::min<std::size_t>(list.mList.size(), kMaxTagElements) : 0;
-        Node node{.label = std::format("LI {} [{}]", name, list.mList.size())};
+        Node node{.label = std::format("{} [{}]", name, list.mList.size())};
         for (std::size_t i = 0; i < shown; ++i) {
             const Tag *element = list.mList[i].get();
             if (element != nullptr && reinterpret_cast<std::uintptr_t>(element) % alignof(Tag) == 0) {
@@ -308,7 +308,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
                 : nullptr;
         const auto shown = std::min<std::size_t>(compound.size(), kMaxTagElements);
 
-        Node node{.label = std::format("CO {}", name)};
+        Node node{.label = std::format("{}", name)};
         const CompoundTag::TagNode *pending[kMaxTreeDepth];
         int depth_left = 0;
         for (std::size_t i = 0; i < shown; ++i) {
@@ -335,9 +335,9 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
     case Tag::Type::IntArray: {
         const auto &data = static_cast<const IntArrayTag &>(tag).mData;
         const auto shown = data.data() != nullptr ? std::min<std::size_t>(data.size(), kMaxTagElements) : 0;
-        Node node{.label = std::format("IA {} [{}]", name, data.size())};
+        Node node{.label = std::format("{} [{}]", name, data.size())};
         for (std::size_t i = 0; i < shown; ++i) {
-            node.children.push_back({.label = std::format("IN [{}]: {}", i, data[i])});
+            node.children.push_back({.label = std::format("[{}]: {}", i, data[i])});
         }
         if (data.size() > shown) {
             node.children.push_back({.label = "..."});
