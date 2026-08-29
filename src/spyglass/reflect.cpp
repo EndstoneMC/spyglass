@@ -23,17 +23,8 @@
 #include "bedrock/cereal/schema/basic_schema.h"
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
-#include "bedrock/nbt/byte_array_tag.h"
-#include "bedrock/nbt/byte_tag.h"
 #include "bedrock/nbt/compound_tag.h"
-#include "bedrock/nbt/double_tag.h"
-#include "bedrock/nbt/float_tag.h"
-#include "bedrock/nbt/int64_tag.h"
-#include "bedrock/nbt/int_array_tag.h"
-#include "bedrock/nbt/int_tag.h"
 #include "bedrock/nbt/list_tag.h"
-#include "bedrock/nbt/short_tag.h"
-#include "bedrock/nbt/string_tag.h"
 #include "bedrock/nbt/tag.h"
 #include "bedrock/network/packet.h"
 #include "bedrock/platform/uuid.h"
@@ -245,38 +236,17 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
 
     switch (type) {
     case Tag::Type::End:
-        parent.children.push_back({.label = std::format("{}", name)});
-        return;
     case Tag::Type::Byte:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const ByteTag &>(tag).data)});
-        return;
     case Tag::Type::Short:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const ShortTag &>(tag).data)});
-        return;
     case Tag::Type::Int:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const IntTag &>(tag).data)});
-        return;
     case Tag::Type::Int64:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const Int64Tag &>(tag).data)});
-        return;
     case Tag::Type::Float:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const FloatTag &>(tag).data)});
-        return;
     case Tag::Type::Double:
-        parent.children.push_back({.label = std::format("{}: {}", name, static_cast<const DoubleTag &>(tag).data)});
-        return;
-    case Tag::Type::ByteArray: {
-        const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
-        const auto *bytes = reinterpret_cast<const char *>(data.data());
-        const std::string_view raw =
-            bytes != nullptr ? std::string_view{bytes, std::min<std::size_t>(data.size(), kMaxText)}
-                             : std::string_view{};
-        parent.children.push_back({.label = std::format("{}: {}", name, blob_or_text(raw, data.size()))});
-        return;
-    }
-    case Tag::Type::String: {
-        const auto &data = static_cast<const StringTag &>(tag).data;
-        parent.children.push_back({.label = std::format("{}: {}", name, blob_or_text(data, data.size()))});
+    case Tag::Type::ByteArray:
+    case Tag::Type::String:
+    case Tag::Type::IntArray: {
+        const auto value = tag.toString();
+        parent.children.push_back({.label = std::format("{}: {}", name, std::string_view{value}.substr(0, kMaxText))});
         return;
     }
     case Tag::Type::List: {
@@ -297,16 +267,6 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         Node node{.label = std::string{name}};
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), std::string_view{key}.substr(0, kMaxText), depth + 1);
-        }
-        parent.children.push_back(std::move(node));
-        return;
-    }
-    case Tag::Type::IntArray: {
-        const auto &data = static_cast<const IntArrayTag &>(tag).mData;
-        const auto shown = data.data() != nullptr ? data.size() : 0;
-        Node node{.label = std::format("{} [{}]", name, data.size())};
-        for (std::size_t i = 0; i < shown; ++i) {
-            node.children.push_back({.label = std::format("[{}]: {}", i, data[i])});
         }
         parent.children.push_back(std::move(node));
         return;

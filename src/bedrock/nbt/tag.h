@@ -1,6 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+
+#include "bedrock/platform/result.h"
+
+class IDataInput;
+class IDataOutput;
 
 class Tag {
 public:
@@ -21,6 +27,10 @@ public:
     };
 
     virtual ~Tag() = default;
+    virtual void deleteChildren() {}
+    virtual void write(IDataOutput &) const {}
+    virtual Bedrock::Result<void> load(IDataInput &) { return {}; }
+    [[nodiscard]] virtual std::string toString() const { return {}; }
 };
 
 static_assert(sizeof(Tag) == 8);
