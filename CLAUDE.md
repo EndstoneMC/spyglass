@@ -102,6 +102,13 @@ A vtable slot derived from declaration order is a guess until it has been read o
 A member offset is a guess until it has been seen in code that uses it. Guesses that happen to be
 right are indistinguishable from guesses that are not, until the client dies holding one.
 
+Declaration order is not slot order. MSVC lays out virtual functions that share a name in reverse
+declaration order, so a set of overloads appears in the vtable back to front while every other
+virtual keeps the order it was written in. `Tag` declares `print(PrintStream &)` before
+`print(std::string const &, PrintStream &)` and the client's vtable holds the two-argument one first.
+A reconstruction that declares them correctly is still right; it is the slot arithmetic that has to
+account for it, which is the whole reason the slot gets read rather than counted.
+
 ### A mirrored type is only as good as its worst member
 
 `sizeof(std::vector<T>)` is 24 whatever `T` is, so a passing size assertion says nothing about an
