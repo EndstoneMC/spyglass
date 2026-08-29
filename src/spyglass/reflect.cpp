@@ -24,6 +24,7 @@
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/network/packet.h"
+#include "bedrock/platform/uuid.h"
 #include "spyglass/network.h"
 #include "spyglass/overlay/capture.h"
 
@@ -135,6 +136,10 @@ std::string text_of(const entt::meta_any &value)
     }
     if (const auto *v = value.try_cast<HashedString>()) {
         return blob_or_text(v->getString(), v->getString().size());
+    }
+    if (const auto *v = value.try_cast<mce::UUID>()) {
+        return std::format("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}", v->data[0] >> 32, (v->data[0] >> 16) & 0xFFFF,
+                           v->data[0] & 0xFFFF, v->data[1] >> 48, v->data[1] & 0xFFFF'FFFF'FFFF);
     }
     const auto *owned = value.try_cast<std::string>();
     const auto *viewed = owned != nullptr ? nullptr : value.try_cast<std::string_view>();
