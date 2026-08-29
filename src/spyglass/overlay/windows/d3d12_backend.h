@@ -31,18 +31,23 @@ private:
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
         Microsoft::WRL::ComPtr<ID3D12Resource> back_buffer;
         D3D12_CPU_DESCRIPTOR_HANDLE render_target{};
+        std::uint64_t submitted{0};
     };
 
     D3D12Backend() = default;
 
     bool initialise(IDXGISwapChain *swap_chain, ID3D12CommandQueue *queue);
     bool ensure_buffers(IDXGISwapChain3 *swap_chain);
+    void wait_for(std::uint64_t submitted);
 
     Microsoft::WRL::ComPtr<ID3D12Device> device_;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue_;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> render_target_heap_;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shader_resource_heap_;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> command_list_;
+    Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
+    HANDLE fence_signalled_{nullptr};
+    std::uint64_t submitted_{0};
     std::vector<Frame> frames_;
     std::vector<bool> shader_resource_slots_;
     std::uint32_t shader_resource_stride_{0};

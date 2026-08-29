@@ -118,6 +118,14 @@ bool D3D12Backend::initialise(IDXGISwapChain *swap_chain, ID3D12CommandQueue *qu
         return false;
     }
 
+    if (FAILED(device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_)))) {
+        return false;
+    }
+    fence_signalled_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (fence_signalled_ == nullptr) {
+        return false;
+    }
+
     shader_resource_slots_.assign(kShaderResourceDescriptors, false);
     shader_resource_stride_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     g_allocator = {
@@ -140,12 +148,26 @@ bool D3D12Backend::initialise(IDXGISwapChain *swap_chain, ID3D12CommandQueue *qu
 
 D3D12Backend::~D3D12Backend()
 {
+    wait_for(submitted_);
     ImGui_ImplDX12_Shutdown();
+    if (fence_signalled_ != nullptr) {
+        CloseHandle(fence_signalled_);
+    }
 }
 
 void D3D12Backend::new_frame()
 {
     ImGui_ImplDX12_NewFrame();
+}
+
+void D3D12Backend::wait_for(const std::uint64_t submitted)
+{
+    if (submitted == 0 || fence_->GetCompletedValue() >= submitted) {
+        return;
+    }
+    if (SUCCEEDED(fence_->SetEventOnCompletion(submitted, fence_signalled_))) {
+        WaitForSingleObject(fence_signalled_, INFINITE);
+    }
 }
 
 bool D3D12Backend::ensure_buffers(IDXGISwapChain3 *swap_chain)
@@ -175,6 +197,7 @@ void D3D12Backend::render(IDXGISwapChain *swap_chain)
         return;
     }
     auto &frame = frames_[index];
+    wait_for(frame.submitted);
 
     if (FAILED(frame.allocator->Reset()) || FAILED(command_list_->Reset(frame.allocator.Get(), nullptr))) {
         return;
@@ -204,11 +227,14 @@ void D3D12Backend::render(IDXGISwapChain *swap_chain)
     if (SUCCEEDED(command_list_->Close())) {
         ID3D12CommandList *lists[] = {command_list_.Get()};
         queue_->ExecuteCommandLists(1, lists);
+        frame.submitted = ++submitted_;
+        queue_->Signal(fence_.Get(), frame.submitted);
     }
 }
 
 void D3D12Backend::release_buffers()
 {
+    wait_for(submitted_);
     for (auto &frame : frames_) {
         frame.back_buffer.Reset();
     }
