@@ -43,6 +43,8 @@ struct StringViewHash {
 
 }  // namespace util::internal
 
+class SerializerContext;
+
 namespace internal {
 
 inline constexpr entt::id_type kCustomGetter = 3212167416;

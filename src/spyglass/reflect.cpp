@@ -21,6 +21,7 @@
 
 #include "bedrock/cereal/context.h"
 #include "bedrock/cereal/schema/basic_schema.h"
+#include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/network/packet.h"
 #include "spyglass/network.h"
@@ -119,6 +120,9 @@ std::string text_of(const entt::meta_any &value)
     if (const auto *v = value.try_cast<bool>()) {
         return *v ? "true" : "false";
     }
+    if (const auto *v = value.try_cast<HashedString>()) {
+        return blob_or_text(v->getString(), v->getString().size());
+    }
     const auto *owned = value.try_cast<std::string>();
     const auto *viewed = owned != nullptr ? nullptr : value.try_cast<std::string_view>();
     if (owned != nullptr || viewed != nullptr) {
@@ -178,7 +182,7 @@ std::string text_of(const entt::meta_any &value)
             }
             std::string name;
             if (const cereal::internal::BasicSchema::MemberDescriptor *descriptor = data.custom()) {
-                name = descriptor->mName;
+                name = descriptor->mNameExt.empty() ? descriptor->mName : descriptor->mNameExt;
             }
             if (name.empty()) {
                 name = std::string{data.name()};
@@ -213,12 +217,36 @@ void append_members(Node &node, entt::meta_any &value, const int depth)
     auto added = false;
     for (auto &&[member_id, data] : type.data()) {
         std::string name;
-        if (const cereal::internal::BasicSchema::MemberDescriptor *descriptor = data.custom()) {
+        const cereal::internal::BasicSchema::MemberDescriptor *descriptor = data.custom();
+        if (descriptor != nullptr) {
             name = descriptor->mName;
         }
         if (name.empty()) {
             name = std::string{data.name()};
         }
+
+        const auto *context = reflection_ctx();
+        if (descriptor != nullptr && descriptor->mDynamicSetterArgCtor != nullptr && context != nullptr) {
+            using Serialize = entt::meta_any (*)(const entt::meta_any &, const cereal::SerializerContext &);
+            alignas(16) static const unsigned char inert[1024]{};
+            const auto thunk = data.get(value);
+            const auto *slot = thunk ? static_cast<const Serialize *>(thunk.base().data()) : nullptr;
+
+            if (slot != nullptr && *slot != nullptr) {
+                if (auto produced = (*slot)(value, *reinterpret_cast<const cereal::SerializerContext *>(inert));
+                    produced) {
+                    append(node, std::move(produced), std::move(name), depth + 1);
+                    added = true;
+                    continue;
+                }
+            }
+
+            const auto bound = descriptor->mDynamicSetterArgCtor(context->internal().mMetaCtx);
+            node.children.push_back({.label = std::format("{}: {}", name, bound.info().name())});
+            added = true;
+            continue;
+        }
+
         append(node, data.get(value), std::move(name), depth + 1);
         added = true;
     }
@@ -311,6 +339,29 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
                     append(parent, contained.from_void(bytes), std::move(name), depth + 1);
                 }
                 return;
+            }
+        }
+
+        if (tpl == entt::resolve<entt::meta_class_template_tag<std::vector>>(meta_ctx)) {
+            const auto element = type.template_arity() >= 1 ? type.template_arg(0) : entt::meta_type{};
+            const auto *const *range = static_cast<const unsigned char *const *>(value.base().data());
+            if (range != nullptr && element && element.size_of() > 0 && type.size_of() == 3 * sizeof(void *)) {
+                const auto *first = range[0];
+                const auto *last = range[1];
+                if (first != nullptr && last >= first &&
+                    static_cast<std::size_t>(last - first) % element.size_of() == 0) {
+                    const auto count = static_cast<std::size_t>(last - first) / element.size_of();
+                    Node node{.label = std::format("{} [{}]", name, count)};
+                    for (std::size_t i = 0; i < std::min(count, kMaxElements); ++i) {
+                        append(node, element.from_void(first + (i * element.size_of())), std::format("[{}]", i),
+                               depth + 1);
+                    }
+                    if (count > kMaxElements) {
+                        node.children.push_back({.label = "..."});
+                    }
+                    parent.children.push_back(std::move(node));
+                    return;
+                }
             }
         }
 
