@@ -35,6 +35,7 @@ struct Record {
     std::uint32_t unread{0};
     std::uint8_t sub_id{0};
     std::optional<Node> error;
+    std::optional<Node> fields;
     Body body;
 };
 
@@ -103,6 +104,7 @@ public:
     [[nodiscard]] double wall_start() const;
     [[nodiscard]] Record at_number(std::uint64_t number) const;
     [[nodiscard]] std::optional<Record> selected_record() const;
+    [[nodiscard]] std::optional<Node> fields(std::uint64_t number);
     [[nodiscard]] std::uint64_t bad() const;
     [[nodiscard]] std::vector<std::uint64_t> counts() const;
     [[nodiscard]] Statistics statistics() const;
@@ -120,6 +122,7 @@ public:
 
 private:
     [[nodiscard]] const Record *find(std::uint64_t number) const;
+    [[nodiscard]] Record *find(std::uint64_t number);
     void trim();
 
     mutable std::mutex mutex_;

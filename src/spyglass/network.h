@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,8 +16,6 @@ struct ReflectionCtx;
 
 namespace spyglass {
 
-struct Node;
-
 struct Hooks {
     void *send_packet{nullptr};
     void *read_no_header{nullptr};
@@ -32,7 +29,6 @@ const Hooks &hooks();
 const std::vector<std::string> &packet_names();
 
 [[nodiscard]] const cereal::ReflectionCtx *reflection_ctx();
-[[nodiscard]] std::optional<Node> error_node(const Bedrock::Result<void> &result);
 [[nodiscard]] std::shared_ptr<Packet> create_packet(int id);
 Bedrock::Result<void> read_no_header(Packet &packet, ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &ctx,
                                      SubClientId sub_id);

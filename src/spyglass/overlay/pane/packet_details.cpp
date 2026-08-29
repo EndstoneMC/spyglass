@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 
 #include <imgui.h>
 
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/options.h"
 #include "spyglass/overlay/theme.h"
-#include "spyglass/reflect.h"
 
 namespace spyglass {
 namespace {
@@ -45,7 +45,7 @@ void draw_node(const ViewOptions &options, const Node &node, const int index)
 
 }  // namespace
 
-void draw_packet_details(const Record *const record, ViewOptions &options, const float height)
+void draw_packet_details(Capture &capture, const Record *const record, ViewOptions &options, const float height)
 {
     ImGui::BeginChild("details", ImVec2{-1.0F, height}, ImGuiChildFlags_Borders);
 
@@ -69,7 +69,13 @@ void draw_packet_details(const Record *const record, ViewOptions &options, const
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
             }
-            if (const auto *fields = decoded_fields(*record); fields != nullptr) {
+            std::optional<Node> lazy;
+            const Node *fields = record->fields ? &*record->fields : nullptr;
+            if (fields == nullptr) {
+                lazy = capture.fields(record->number);
+                fields = lazy ? &*lazy : nullptr;
+            }
+            if (fields != nullptr && !fields->children.empty()) {
                 int child = 0;
                 for (const auto &field : fields->children) {
                     draw_node(options, field, child++);

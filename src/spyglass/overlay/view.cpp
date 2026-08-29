@@ -135,12 +135,12 @@ void View::draw()
                 if (usable > 0.0F) {
                     details_share_ = details / usable;
                 }
-                draw_packet_details(record, options_, details);
+                draw_packet_details(capture_, record, options_, details);
                 splitter("details_splitter", details_share_, usable);
                 draw_packet_bytes(record, number, bytes_view_, options_, usable - list_height - details);
             }
             else if (options_.details_pane) {
-                draw_packet_details(record, options_, usable - list_height);
+                draw_packet_details(capture_, record, options_, usable - list_height);
             }
             else {
                 draw_packet_bytes(record, number, bytes_view_, options_, usable - list_height);
@@ -173,7 +173,7 @@ void View::draw()
         if (ImGui::Begin(title, &open.open)) {
             const auto pinned = capture_.at_number(open.number);
             const auto *const record = pinned.number == 0 ? nullptr : &pinned;
-            draw_packet_details(record, options_, ImGui::GetContentRegionAvail().y * 0.4F);
+            draw_packet_details(capture_, record, options_, ImGui::GetContentRegionAvail().y * 0.4F);
             draw_packet_bytes(record, open.number, open.bytes, options_, ImGui::GetContentRegionAvail().y);
         }
         ImGui::End();

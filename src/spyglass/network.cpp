@@ -20,6 +20,7 @@
 #include "spyglass/hook.h"
 #include "spyglass/overlay/view.h"
 #include "spyglass/pattern.h"
+#include "spyglass/reflect.h"
 #include "spyglass/signature.h"
 
 namespace {
@@ -105,18 +106,21 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
     const auto begin = stream.getReadPointer();
     const auto view = stream.getView();
 
-    if (kBreakFirstSubChunk && static_cast<int>(getId()) == kSubChunkPacket && !g_broke_one.exchange(true)) {
+    const auto id = static_cast<int>(getId());
+
+    if (kBreakFirstSubChunk && id == kSubChunkPacket && !g_broke_one.exchange(true)) {
         const auto body = view.substr(std::min(begin, view.size()));
         ReadOnlyBinaryStream truncated{body.substr(0, body.size() / 2), true};
         auto broken =
             SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, this, truncated, reflection_ctx, sub_id);
         stream.setReadPointer(view.size());
         spyglass::View::getInstance().onPacketReceive({
-            .id = static_cast<int>(getId()),
+            .id = id,
             .name = std::string{getName()},
             .decoded = broken.asExpected().has_value(),
             .unread = static_cast<std::uint32_t>(body.size() - truncated.getReadPointer()),
             .error = error_of(broken),
+            .fields = spyglass::decode_fields(*this, id),
             .body = body_of(body),
         });
         return broken;
@@ -125,12 +129,13 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
     auto result = SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, this, stream, reflection_ctx, sub_id);
 
     spyglass::View::getInstance().onPacketReceive({
-        .id = static_cast<int>(getId()),
+        .id = id,
         .name = std::string{getName()},
         .decoded = result.asExpected().has_value(),
         .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
         .sub_id = static_cast<std::uint8_t>(sub_id),
         .error = error_of(result),
+        .fields = spyglass::decode_fields(*this, id),
         .body = body_of(view.substr(std::min(begin, view.size()))),
     });
     return result;
@@ -177,11 +182,6 @@ const std::vector<std::string> &packet_names()
 const cereal::ReflectionCtx *reflection_ctx()
 {
     return g_reflection.load(std::memory_order_relaxed);
-}
-
-std::optional<Node> error_node(const Bedrock::Result<void> &result)
-{
-    return error_of(result);
 }
 
 std::shared_ptr<Packet> create_packet(const int id)

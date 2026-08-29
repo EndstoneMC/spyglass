@@ -3,6 +3,8 @@
 #include <chrono>
 #include <utility>
 
+#include "spyglass/reflect.h"
+
 namespace spyglass {
 namespace {
 
@@ -111,6 +113,11 @@ const Record *Capture::find(const std::uint64_t number) const
     return &records_[static_cast<std::size_t>(index)];
 }
 
+Record *Capture::find(const std::uint64_t number)
+{
+    return const_cast<Record *>(std::as_const(*this).find(number));
+}
+
 Record Capture::at_number(const std::uint64_t number) const
 {
     const std::lock_guard lock{mutex_};
@@ -127,6 +134,36 @@ std::optional<Record> Capture::selected_record() const
         return *record;
     }
     return std::nullopt;
+}
+
+std::optional<Node> Capture::fields(const std::uint64_t number)
+{
+    int id = -1;
+    Body body;
+    {
+        const std::lock_guard lock{mutex_};
+        const auto *record = find(number);
+        if (record == nullptr) {
+            return std::nullopt;
+        }
+        if (record->fields) {
+            return record->fields;
+        }
+        id = record->id;
+        body = record->body;
+    }
+
+    if (!body) {
+        return std::nullopt;
+    }
+    auto decoded = decode_body(id, {reinterpret_cast<const char *>(body->data()), body->size()})
+                       .value_or(Node{.label = "Fields"});
+
+    const std::lock_guard lock{mutex_};
+    if (auto *record = find(number); record != nullptr && record->body == body) {
+        record->fields = decoded;
+    }
+    return decoded;
 }
 
 std::uint64_t Capture::bad() const

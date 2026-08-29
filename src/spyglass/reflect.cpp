@@ -39,13 +39,9 @@ static_assert(entt::type_hash<CompoundTag>::value() == 0xBD1A8574);
 
 namespace {
 
-constexpr int kMaxDepth = 8;
-constexpr std::size_t kMaxElements = 64;
-constexpr int kMaxNodes = 4096;
+constexpr int kMaxDepth = 64;
 constexpr std::size_t kMaxText = 96;
 constexpr std::size_t kMaxBytes = 16;
-
-int g_nodes = 0;
 
 template <template <typename...> class T>
 bool is_specialization(const entt::meta_type &type)
@@ -290,7 +286,7 @@ void append_members(Node &node, entt::meta_any &value, const int depth)
 
 void append(Node &parent, entt::meta_any value, std::string name, const int depth)
 {
-    if (!value || depth > kMaxDepth || ++g_nodes > kMaxNodes) {
+    if (!value || depth > kMaxDepth) {
         return;
     }
 
@@ -325,10 +321,6 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         Node node{.label = std::format("{} [{}]", name, elements.size())};
         std::size_t index = 0;
         for (auto &&element : elements) {
-            if (index >= kMaxElements) {
-                node.children.push_back({.label = "..."});
-                break;
-            }
             append(node, element.as_ref(), std::format("[{}]", index), depth + 1);
             ++index;
         }
@@ -339,14 +331,8 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
     if (type.is_associative_container()) {
         auto entries = value.as_associative_container();
         Node node{.label = std::format("{} [{}]", name, entries.size())};
-        std::size_t index = 0;
         for (auto &&[key, mapped] : entries) {
-            if (index >= kMaxElements) {
-                node.children.push_back({.label = "..."});
-                break;
-            }
             append(node, mapped.as_ref(), text_of(key), depth + 1);
-            ++index;
         }
         parent.children.push_back(std::move(node));
         return;
@@ -376,12 +362,9 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
                 static_cast<std::size_t>(last - first) % element.size_of() == 0) {
                 const auto count = static_cast<std::size_t>(last - first) / element.size_of();
                 Node node{.label = std::format("{} [{}]", name, count)};
-                for (std::size_t i = 0; i < std::min(count, kMaxElements); ++i) {
+                for (std::size_t i = 0; i < count; ++i) {
                     append(node, element.from_void(first + (i * element.size_of())), std::format("[{}]", i),
                            depth + 1);
-                }
-                if (count > kMaxElements) {
-                    node.children.push_back({.label = "..."});
                 }
                 parent.children.push_back(std::move(node));
                 return;
@@ -491,80 +474,71 @@ const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ct
     return types;
 }
 
-std::optional<Node> decode(const Record &record)
-{
-    g_nodes = 0;
-    const auto *ctx = reflection_ctx();
-    if (ctx == nullptr || !record.body || record.body->empty() || record.id < 0) {
-        return std::nullopt;
-    }
-
-    const auto packet = create_packet(record.id);
-    if (!packet) {
-        return std::nullopt;
-    }
-    packet->setSerializationMode(SerializationMode::CerealOnly);
-
-    const std::string_view body{reinterpret_cast<const char *>(record.body->data()), record.body->size()};
-    ReadOnlyBinaryStream stream{body, true};
-
-    const auto result = read_no_header(*packet, stream, *ctx, static_cast<SubClientId>(record.sub_id));
-
-    const auto &types = packet_types(ctx->internal().mMetaCtx);
-    const auto entry = types.find(record.id);
-    if (entry == types.end()) {
-        return std::nullopt;
-    }
-
-    auto instance = entry->second.from_void(packet.get(), false);
-    if (!instance) {
-        return std::nullopt;
-    }
-
-    Node root{.label = "Fields"};
-    if (!result.asExpected().has_value()) {
-        const auto consumed = stream.getReadPointer();
-        const auto size = record.body->size();
-        Node stopped{.label = consumed < size
-                                  ? std::format("decoded, {} of {} bytes unconsumed", size - consumed, size)
-                                  : std::format("decode failed after {} of {} bytes", consumed, size)};
-        if (auto reason = error_node(result)) {
-            stopped.children.push_back(std::move(*reason));
-        }
-        root.children.push_back(std::move(stopped));
-    }
-    append_members(root, instance, 0);
-    if (root.children.empty()) {
-        const auto type = entry->second;
-        std::size_t bases = 0;
-        for (auto it = type.base().begin(); it != type.base().end(); ++it) {
-            ++bases;
-        }
-        std::size_t members = 0;
-        for (auto it = type.data().begin(); it != type.data().end(); ++it) {
-            ++members;
-        }
-        root.children.push_back(
-            {.label = std::format("no fields: types {} bases {} members {} getter {}", types.size(), bases, members,
-                                  type.func(cereal::internal::kCustomGetter) ? "yes" : "no")});
-    }
-    return root;
-}
-
 }  // namespace
 
-const Node *decoded_fields(const Record &record)
+std::optional<Node> decode_fields(Packet &packet, const int id)
 {
-    static std::uint64_t cached_number = 0;
-    static const void *cached_body = nullptr;
-    static std::optional<Node> cached;
+    try {
+        const auto *ctx = reflection_ctx();
+        if (ctx == nullptr || id < 0) {
+            return std::nullopt;
+        }
 
-    if (record.number != cached_number || record.body.get() != cached_body) {
-        cached_number = record.number;
-        cached_body = record.body.get();
-        cached = decode(record);
+        const auto &types = packet_types(ctx->internal().mMetaCtx);
+        const auto entry = types.find(id);
+        if (entry == types.end()) {
+            return std::nullopt;
+        }
+
+        auto instance = entry->second.from_void(&packet, false);
+        if (!instance) {
+            return std::nullopt;
+        }
+
+        Node root{.label = "Fields"};
+        append_members(root, instance, 0);
+        if (root.children.empty()) {
+            const auto type = entry->second;
+            std::size_t bases = 0;
+            for (auto it = type.base().begin(); it != type.base().end(); ++it) {
+                ++bases;
+            }
+            std::size_t members = 0;
+            for (auto it = type.data().begin(); it != type.data().end(); ++it) {
+                ++members;
+            }
+            root.children.push_back(
+                {.label = std::format("no fields: types {} bases {} members {} getter {}", types.size(), bases,
+                                      members, type.func(cereal::internal::kCustomGetter) ? "yes" : "no")});
+        }
+        return root;
     }
-    return cached ? &*cached : nullptr;
+    catch (...) {
+        return std::nullopt;
+    }
+}
+
+std::optional<Node> decode_body(const int id, const std::string_view body)
+{
+    try {
+        const auto *ctx = reflection_ctx();
+        if (ctx == nullptr || id < 0 || body.empty()) {
+            return std::nullopt;
+        }
+
+        const auto packet = create_packet(id);
+        if (!packet) {
+            return std::nullopt;
+        }
+        packet->setSerializationMode(SerializationMode::CerealOnly);
+
+        ReadOnlyBinaryStream stream{body, true};
+        read_no_header(*packet, stream, *ctx, SubClientId::PrimaryClient);
+        return decode_fields(*packet, id);
+    }
+    catch (...) {
+        return std::nullopt;
+    }
 }
 
 }  // namespace spyglass
