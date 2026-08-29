@@ -1,46 +1,37 @@
 #pragma once
 
-#include <cstddef>
+#include <functional>
+#include <map>
 #include <string>
 
-#include "bedrock/nbt/compound_tag_variant.h"
+#include "bedrock/nbt/byte_array_tag.h"
+#include "bedrock/nbt/byte_tag.h"
+#include "bedrock/nbt/double_tag.h"
+#include "bedrock/nbt/end_tag.h"
+#include "bedrock/nbt/float_tag.h"
+#include "bedrock/nbt/int64_tag.h"
+#include "bedrock/nbt/int_array_tag.h"
+#include "bedrock/nbt/int_tag.h"
+#include "bedrock/nbt/list_tag.h"
+#include "bedrock/nbt/short_tag.h"
+#include "bedrock/nbt/string_tag.h"
 #include "bedrock/nbt/tag.h"
+
+class CompoundTagVariant;
+using TagMap = std::map<std::string, CompoundTagVariant, std::less<>>;
 
 class CompoundTag : public Tag {
 public:
-#ifdef _WIN32
-    struct TagNode {
-        TagNode *mLeft;
-        TagNode *mParent;
-        TagNode *mRight;
-        char mColor;
-        char mIsNil;
-        std::string mKey;
-        CompoundTagVariant mValue;
-    };
-
-    [[nodiscard]] const TagNode *head() const { return mTags.mHead; }
-#endif
-
-    [[nodiscard]] std::size_t size() const { return mTags.mSize; }
+    [[nodiscard]] const TagMap &rawView() const { return mTags; }
 
 private:
-    struct TagMap {
-#ifdef _WIN32
-        TagNode *mHead;
-#else
-        void *mBeginNode;
-        void *mEndNode;
-#endif
-        std::size_t mSize;
-    };
-
     TagMap mTags;
 };
 
 #ifdef _WIN32
 static_assert(sizeof(CompoundTag) == 24);
-static_assert(sizeof(CompoundTag::TagNode) == 112);
 #else
 static_assert(sizeof(CompoundTag) == 32);
 #endif
+
+#include "bedrock/nbt/compound_tag_variant.h"

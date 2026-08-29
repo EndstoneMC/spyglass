@@ -15,8 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   client failed to read still shows the fields it managed before it stopped. Identifiers read as
   ordinary UUIDs, item stacks and recipes as the fields they are sent as, and a field holding NBT
   opens as a tree of the tag itself, every entry prefixed with a two letter type so the column lines
-  up. On the build the Linux launcher loads, NBT still reports only how many entries the tag has. A
-  wrapper holding a single value is shown as that value rather than as a branch to open.
+  up. A wrapper holding a single value is shown as that value rather than as a branch to open.
 - A filter for the packet list, opened with `Filter` on the toolbar. It lists every packet the client
   knows, by id, each with a tick box and the number of them seen so far. Untick the ones you do not
   want in the list. The find box narrows what the window itself shows, and `All`, `None` and `Invert`

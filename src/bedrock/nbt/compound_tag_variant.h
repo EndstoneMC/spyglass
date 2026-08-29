@@ -1,22 +1,20 @@
 #pragma once
 
-#ifdef _WIN32
-
-#include "bedrock/nbt/tag.h"
+#include <variant>
 
 class CompoundTagVariant {
 public:
-    struct Variant {
-        alignas(8) unsigned char mStorage[40];
-        unsigned char mWhich;
-    };
+    using Variant = std::variant<EndTag, ByteTag, ShortTag, IntTag, Int64Tag, FloatTag, DoubleTag, ByteArrayTag,
+                                 StringTag, ListTag, CompoundTag, IntArrayTag>;
 
-    [[nodiscard]] Tag::Type index() const { return static_cast<Tag::Type>(mTagStorage.mWhich); }
-    [[nodiscard]] const Tag &operator*() const { return *reinterpret_cast<const Tag *>(mTagStorage.mStorage); }
+    [[nodiscard]] Tag::Type index() const { return static_cast<Tag::Type>(mTagStorage.index()); }
+
+    [[nodiscard]] const Tag &operator*() const
+    {
+        return std::visit([](const Tag &tag) -> const Tag & { return tag; }, mTagStorage);
+    }
 
     Variant mTagStorage;
 };
 
 static_assert(sizeof(CompoundTagVariant) == 48);
-
-#endif

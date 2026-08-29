@@ -26,7 +26,6 @@
 #include "bedrock/nbt/byte_array_tag.h"
 #include "bedrock/nbt/byte_tag.h"
 #include "bedrock/nbt/compound_tag.h"
-#include "bedrock/nbt/compound_tag_variant.h"
 #include "bedrock/nbt/double_tag.h"
 #include "bedrock/nbt/float_tag.h"
 #include "bedrock/nbt/int64_tag.h"
@@ -157,7 +156,7 @@ std::string text_of(const entt::meta_any &value)
         if (value.type().size_of() != sizeof(CompoundTag)) {
             return "<compound tag, layout not recognised>";
         }
-        const auto entries = v->size();
+        const auto entries = v->rawView().size();
         return std::format("<compound, {} {}>", entries, entries == 1 ? "entry" : "entries");
     }
     const auto *owned = value.try_cast<std::string>();
@@ -233,9 +232,7 @@ std::string text_of(const entt::meta_any &value)
     return {};
 }
 
-#ifdef _WIN32
 constexpr int kMaxTagDepth = 16;
-constexpr int kMaxTreeDepth = 64;
 constexpr std::size_t kMaxTagElements = 64;
 constexpr int kMaxTagNodes = 4096;
 
@@ -300,33 +297,16 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         return;
     }
     case Tag::Type::Compound: {
-        const auto &compound = static_cast<const CompoundTag &>(tag);
-        const auto *head = compound.head();
-        const auto *cursor =
-            head != nullptr && reinterpret_cast<std::uintptr_t>(head) % alignof(CompoundTag::TagNode) == 0
-                ? head->mParent
-                : nullptr;
-        const auto shown = std::min<std::size_t>(compound.size(), kMaxTagElements);
+        const auto &tags = static_cast<const CompoundTag &>(tag).rawView();
+        const auto shown = std::min<std::size_t>(tags.size(), kMaxTagElements);
 
         Node node{.label = std::format("{}", name)};
-        const CompoundTag::TagNode *pending[kMaxTreeDepth];
-        int depth_left = 0;
-        for (std::size_t i = 0; i < shown; ++i) {
-            while (cursor != nullptr &&
-                   reinterpret_cast<std::uintptr_t>(cursor) % alignof(CompoundTag::TagNode) == 0 &&
-                   cursor->mIsNil == 0 && depth_left < kMaxTreeDepth) {
-                pending[depth_left++] = cursor;
-                cursor = cursor->mLeft;
-            }
-            if (depth_left == 0) {
-                break;
-            }
-            const auto *entry = pending[--depth_left];
-            append_tag(node, *entry->mValue, entry->mValue.index(),
-                       std::string_view{entry->mKey}.substr(0, kMaxText), depth + 1);
-            cursor = entry->mRight;
+        auto entry = tags.begin();
+        for (std::size_t i = 0; i < shown && entry != tags.end(); ++i, ++entry) {
+            append_tag(node, *entry->second, entry->second.index(),
+                       std::string_view{entry->first}.substr(0, kMaxText), depth + 1);
         }
-        if (compound.size() > shown) {
+        if (tags.size() > shown) {
             node.children.push_back({.label = "..."});
         }
         parent.children.push_back(std::move(node));
@@ -350,7 +330,6 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         return;
     }
 }
-#endif
 
 void append(Node &parent, entt::meta_any value, std::string name, int depth);
 
@@ -422,14 +401,12 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         return;
     }
 
-#ifdef _WIN32
     if (const auto *tag = value.try_cast<CompoundTag>();
         tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
         g_tag_nodes = 0;
         append_tag(parent, *tag, Tag::Type::Compound, name, 0);
         return;
     }
-#endif
 
     if (const auto text = text_of(value); !text.empty()) {
         parent.children.push_back({.label = std::format("{}: {}", name, text)});
