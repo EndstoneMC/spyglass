@@ -73,8 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   budget.
 - **BREAKING**: the retained packet and retained megabyte limits are gone, along with the settings
   for them. Nothing is dropped for age any more, so there is nothing to size.
-- Fields are decoded when a packet is opened rather than when it arrives. Decoding every packet cost
-  the client's own thread the work of building a tree for packets nobody looked at.
+- Decoded fields are stored with the packet, so selecting a row shows them without waiting. A
+  received packet's fields are read out of the object the client itself decoded, which is the only
+  way to see what a packet that failed to read managed before it stopped. A sent packet has no such
+  object, so it is decoded from its bytes the first time it is opened, and the result is kept from
+  then on.
 
 ### Fixed
 
@@ -82,6 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer take focus.
 - The expert information window and the status bar walked the whole capture every frame. They now
   read a running tally.
+- Resizing the game window killed the client. The overlay held on to the swap chain's buffers across
+  the resize, which the client's own resize could not survive.
 
 ## [0.2.0] - 2026-08-28
 

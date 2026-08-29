@@ -30,6 +30,7 @@ constexpr std::string_view kMagic = "SPYGCAP";
 constexpr std::string_view kPrefix = "spyglass_";
 constexpr std::string_view kExtension = ".cap";
 constexpr std::string_view kIndexExtension = ".index";
+constexpr std::string_view kFieldsExtension = ".fields";
 constexpr std::string_view kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 constexpr std::uint32_t kVersion = 1;
 constexpr int kMaxDepth = 64;
@@ -187,11 +188,15 @@ void intern_name(const int id, const std::string_view name)
     }
 }
 
-void pack(std::vector<std::uint8_t> &blob, const std::string_view body, const std::optional<Node> &error)
+void pack(std::vector<std::uint8_t> &blob, const std::string_view body, const std::optional<Node> &error,
+          const std::optional<Node> &fields)
 {
     blob.assign(body.begin(), body.end());
     if (error) {
         put(blob, *error, 0);
+    }
+    if (fields) {
+        put(blob, *fields, 0);
     }
 }
 
@@ -209,13 +214,16 @@ Store::~Store()
 
     writer_.close();
     index_writer_.close();
+    fields_writer_.close();
     reader_.close();
     index_reader_.close();
+    fields_reader_.close();
     drop_lock(lock_);
 
     std::error_code ec;
     std::filesystem::remove(path_, ec);
     std::filesystem::remove(index_path_, ec);
+    std::filesystem::remove(fields_path_, ec);
 }
 
 void sweep_captures()
@@ -237,13 +245,16 @@ void sweep_captures()
         drop_lock(lock);
         std::filesystem::remove(item.path(), ec);
         std::filesystem::remove(std::filesystem::path{item.path()}.replace_extension(kIndexExtension), ec);
+        std::filesystem::remove(std::filesystem::path{item.path()}.replace_extension(kFieldsExtension), ec);
     }
 }
 
 void Store::restart()
 {
-    const std::scoped_lock lock{mutex_, read_mutex_, queue_mutex_};
+    const std::scoped_lock lock{mutex_, read_mutex_, queue_mutex_, fields_mutex_};
 
+    field_at_.clear();
+    fields_offset_ = 0;
     queue_.clear();
     queued_bytes_ = 0;
     blocks_.clear();
@@ -255,18 +266,23 @@ void Store::restart()
 
     writer_.close();
     index_writer_.close();
+    fields_writer_.close();
     reader_.close();
     index_reader_.close();
+    fields_reader_.close();
     writer_.clear();
     index_writer_.clear();
+    fields_writer_.clear();
     reader_.clear();
     index_reader_.clear();
+    fields_reader_.clear();
     drop_lock(lock_);
 
     std::error_code ec;
     if (!path_.empty()) {
         std::filesystem::remove(path_, ec);
         std::filesystem::remove(index_path_, ec);
+        std::filesystem::remove(fields_path_, ec);
     }
 
     const auto directory = std::filesystem::temp_directory_path(ec);
@@ -285,6 +301,7 @@ void Store::restart()
         }
         path_ = directory / (name + std::string{kExtension});
         index_path_ = directory / (name + std::string{kIndexExtension});
+        fields_path_ = directory / (name + std::string{kFieldsExtension});
         if (std::filesystem::exists(path_, ec)) {
             continue;
         }
@@ -292,7 +309,8 @@ void Store::restart()
     }
 
     index_writer_.open(index_path_, std::ios::binary | std::ios::trunc);
-    if (!writer_ || !index_writer_) {
+    fields_writer_.open(fields_path_, std::ios::binary | std::ios::trunc);
+    if (!writer_ || !index_writer_ || !fields_writer_) {
         failure_ = std::format("could not open {}", path_.string());
         report_error(failure_);
         return;
@@ -311,7 +329,8 @@ void Store::restart()
 
     reader_.open(path_, std::ios::binary);
     index_reader_.open(index_path_, std::ios::binary);
-    if (!reader_ || !index_reader_) {
+    fields_reader_.open(fields_path_, std::ios::binary);
+    if (!reader_ || !index_reader_ || !fields_reader_) {
         failure_ = std::format("could not read back {}", path_.string());
         report_error(failure_);
     }
@@ -454,7 +473,7 @@ bool Store::at(const std::uint64_t number, Entry &entry) const
     return true;
 }
 
-Blob Store::read(const Entry &entry) const
+Blob Store::read(const Entry &entry, const bool with_fields) const
 {
     std::vector<std::uint8_t> raw;
     {
@@ -476,15 +495,68 @@ Blob Store::read(const Entry &entry) const
 
     Blob blob;
     blob.body = std::make_shared<const std::vector<std::uint8_t>>(raw.begin(), raw.begin() + entry.body_length);
+    std::string_view rest{reinterpret_cast<const char *>(raw.data()) + entry.body_length,
+                          entry.blob_length - entry.body_length};
     if ((entry.flags & kHasError) != 0) {
-        std::string_view rest{reinterpret_cast<const char *>(raw.data()) + entry.body_length,
-                              entry.blob_length - entry.body_length};
         Node error;
-        if (take(rest, error, 0)) {
-            blob.error = std::move(error);
+        if (!take(rest, error, 0)) {
+            return blob;
+        }
+        blob.error = std::move(error);
+    }
+    if (with_fields && (entry.flags & kHasFields) != 0) {
+        Node fields;
+        if (take(rest, fields, 0)) {
+            blob.fields = std::move(fields);
         }
     }
     return blob;
+}
+
+std::optional<Node> Store::fields(const std::uint64_t number, const Entry &entry) const
+{
+    if ((entry.flags & kHasFields) != 0) {
+        return read(entry, true).fields;
+    }
+
+    const std::lock_guard lock{fields_mutex_};
+    const auto at = field_at_.find(number);
+    if (at == field_at_.end() || !fields_reader_.is_open()) {
+        return std::nullopt;
+    }
+
+    std::vector<std::uint8_t> raw(at->second.second);
+    fields_reader_.clear();
+    fields_reader_.seekg(static_cast<std::streamoff>(at->second.first));
+    fields_reader_.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(raw.size()));
+    if (fields_reader_.gcount() != static_cast<std::streamsize>(raw.size())) {
+        return std::nullopt;
+    }
+
+    std::string_view rest{reinterpret_cast<const char *>(raw.data()), raw.size()};
+    Node fields;
+    if (!take(rest, fields, 0)) {
+        return std::nullopt;
+    }
+    return fields;
+}
+
+void Store::store_fields(const std::uint64_t number, const Node &fields)
+{
+    std::vector<std::uint8_t> raw;
+    put(raw, fields, 0);
+
+    const std::lock_guard lock{fields_mutex_};
+    if (!fields_writer_.is_open() || field_at_.contains(number)) {
+        return;
+    }
+    fields_writer_.write(reinterpret_cast<const char *>(raw.data()), static_cast<std::streamsize>(raw.size()));
+    fields_writer_.flush();
+    if (!fields_writer_) {
+        return;
+    }
+    field_at_.emplace(number, std::pair{fields_offset_, static_cast<std::uint32_t>(raw.size())});
+    fields_offset_ += raw.size();
 }
 
 std::uint64_t Store::written() const

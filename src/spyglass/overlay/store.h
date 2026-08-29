@@ -13,6 +13,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace spyglass {
@@ -32,6 +34,7 @@ struct Node {
 constexpr std::uint8_t kOutbound = 1U << 0U;
 constexpr std::uint8_t kDecoded = 1U << 1U;
 constexpr std::uint8_t kHasError = 1U << 2U;
+constexpr std::uint8_t kHasFields = 1U << 3U;
 
 constexpr std::size_t kBlockEntries = 8192;
 
@@ -51,6 +54,7 @@ static_assert(sizeof(Entry) == 32);
 struct Blob {
     Body body;
     std::optional<Node> error;
+    std::optional<Node> fields;
 };
 
 struct StoreOptions {
@@ -64,7 +68,8 @@ struct StoreOptions {
 std::string_view interned_name(int id);
 void intern_name(int id, std::string_view name);
 
-void pack(std::vector<std::uint8_t> &blob, std::string_view body, const std::optional<Node> &error);
+void pack(std::vector<std::uint8_t> &blob, std::string_view body, const std::optional<Node> &error,
+          const std::optional<Node> &fields);
 
 void sweep_captures();
 
@@ -85,7 +90,10 @@ public:
     [[nodiscard]] std::string failure() const;
 
     [[nodiscard]] bool at(std::uint64_t number, Entry &entry) const;
-    [[nodiscard]] Blob read(const Entry &entry) const;
+    [[nodiscard]] Blob read(const Entry &entry, bool with_fields = false) const;
+
+    [[nodiscard]] std::optional<Node> fields(std::uint64_t number, const Entry &entry) const;
+    void store_fields(std::uint64_t number, const Node &fields);
 
     void restart();
 
@@ -109,10 +117,17 @@ private:
     mutable std::mutex read_mutex_;
     mutable std::ifstream reader_;
 
+    mutable std::mutex fields_mutex_;
+    mutable std::ifstream fields_reader_;
+    std::ofstream fields_writer_;
+    std::unordered_map<std::uint64_t, std::pair<std::uint64_t, std::uint32_t>> field_at_;
+    std::uint64_t fields_offset_{0};
+
     std::ofstream index_writer_;
     std::ofstream writer_;
     std::filesystem::path path_;
     std::filesystem::path index_path_;
+    std::filesystem::path fields_path_;
     std::intptr_t lock_{-1};
 
     mutable std::mutex queue_mutex_;

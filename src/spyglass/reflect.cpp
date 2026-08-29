@@ -228,7 +228,7 @@ std::string text_of(const entt::meta_any &value)
 constexpr int kMaxTagDepth = 16;
 constexpr int kMaxTagNodes = 4096;
 
-int g_tag_nodes = 0;
+thread_local int g_tag_nodes = 0;
 
 void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::string_view name, const int depth)
 {

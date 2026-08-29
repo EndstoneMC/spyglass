@@ -41,6 +41,7 @@ struct Incoming {
     std::uint32_t unread{0};
     std::uint8_t sub_id{0};
     std::optional<Node> error;
+    std::optional<Node> fields;
     std::string_view body;
 };
 

@@ -54,7 +54,7 @@ void Capture::record(Incoming incoming, const Direction direction)
     intern_name(incoming.id, incoming.name);
 
     std::vector<std::uint8_t> blob;
-    pack(blob, incoming.body, incoming.error);
+    pack(blob, incoming.body, incoming.error, incoming.fields);
 
     const std::lock_guard lock{mutex_};
     if (!running_) {
@@ -74,7 +74,8 @@ void Capture::record(Incoming incoming, const Direction direction)
         .id = static_cast<std::int16_t>(incoming.id),
         .sub_id = incoming.sub_id,
         .flags = static_cast<std::uint8_t>((direction == Direction::Outbound ? kOutbound : 0U) |
-                                           (incoming.decoded ? kDecoded : 0U) | (incoming.error ? kHasError : 0U)),
+                                           (incoming.decoded ? kDecoded : 0U) | (incoming.error ? kHasError : 0U) |
+                                           (incoming.fields ? kHasFields : 0U)),
     };
     if (!store_.push(entry, std::move(blob))) {
         return;
@@ -193,18 +194,23 @@ std::optional<Node> Capture::fields(const std::uint64_t number)
     if (!store_.at(number, entry)) {
         return std::nullopt;
     }
-    const auto blob = store_.read(entry);
-    if (!blob.body) {
-        return std::nullopt;
+
+    auto decoded = store_.fields(number, entry);
+    if (!decoded) {
+        const auto blob = store_.read(entry);
+        if (!blob.body) {
+            return std::nullopt;
+        }
+        decoded = decode_body(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()})
+                      .value_or(Node{.label = "Fields"});
+        store_.store_fields(number, *decoded);
     }
-    auto decoded = decode_body(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()})
-                       .value_or(Node{.label = "Fields"});
 
     const std::lock_guard lock{fields_mutex_};
     if (const auto at = field_at_.find(number); at != field_at_.end()) {
         return at->second->second;
     }
-    fields_.emplace_front(number, std::move(decoded));
+    fields_.emplace_front(number, std::move(*decoded));
     field_at_[number] = fields_.begin();
     while (fields_.size() > kFieldCache) {
         field_at_.erase(fields_.back().first);
