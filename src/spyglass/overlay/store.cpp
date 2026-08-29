@@ -35,6 +35,7 @@ constexpr std::uint32_t kVersion = 1;
 constexpr int kMaxDepth = 64;
 constexpr int kRandomChars = 6;
 constexpr std::intptr_t kNoLock = -1;
+constexpr unsigned long kLockRegion = 0x40000000;
 constexpr auto kIdle = std::chrono::milliseconds{50};
 
 std::intptr_t take_lock(const std::filesystem::path &path)
@@ -46,6 +47,7 @@ std::intptr_t take_lock(const std::filesystem::path &path)
         return kNoLock;
     }
     OVERLAPPED at{};
+    at.OffsetHigh = kLockRegion;
     if (LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &at) == 0) {
         CloseHandle(handle);
         return kNoLock;
@@ -355,6 +357,13 @@ void Store::run()
         }
         writer_.flush();
         index_writer_.flush();
+        if (!writer_ || !index_writer_) {
+            const std::lock_guard lock{queue_mutex_};
+            if (failure_.empty()) {
+                failure_ = std::format("could not write {}", path_.string());
+                report_error(failure_);
+            }
+        }
 
         {
             const std::lock_guard lock{mutex_};
