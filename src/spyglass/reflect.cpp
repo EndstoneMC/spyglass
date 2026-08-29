@@ -24,6 +24,7 @@
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/nbt/byte_array_tag.h"
+#include "bedrock/nbt/byte_tag.h"
 #include "bedrock/nbt/compound_tag.h"
 #include "bedrock/nbt/list_tag.h"
 #include "bedrock/nbt/tag.h"
@@ -237,7 +238,6 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
 
     switch (type) {
     case Tag::Type::End:
-    case Tag::Type::Byte:
     case Tag::Type::Short:
     case Tag::Type::Int:
     case Tag::Type::Int64:
@@ -249,6 +249,10 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         parent.children.push_back({.label = std::format("{}: {}", name, std::string_view{value}.substr(0, kMaxText))});
         return;
     }
+    case Tag::Type::Byte:
+        parent.children.push_back(
+            {.label = std::format("{}: {}", name, static_cast<unsigned>(static_cast<const ByteTag &>(tag).data))});
+        return;
     case Tag::Type::ByteArray: {
         const auto summary = tag.toString();
         const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
