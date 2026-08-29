@@ -8,6 +8,7 @@
 #include <string>
 
 #include <d3d11.h>
+#include <dxgi1_4.h>
 #include <wrl/client.h>
 
 #include <imgui.h>
@@ -27,14 +28,18 @@ constexpr bool kInputDiagnostics = false;
 
 constexpr std::size_t kPresentSlot = 8;
 constexpr std::size_t kResizeBuffersSlot = 13;
+constexpr std::size_t kResizeBuffers1Slot = 39;
 constexpr std::size_t kExecuteCommandListsSlot = 10;
 
 using PresentFn = HRESULT(IDXGISwapChain *, UINT, UINT);
 using ResizeBuffersFn = HRESULT(IDXGISwapChain *, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+using ResizeBuffers1Fn = HRESULT(IDXGISwapChain3 *, UINT, UINT, UINT, DXGI_FORMAT, UINT, const UINT *,
+                                 IUnknown *const *);
 using ExecuteCommandListsFn = void(ID3D12CommandQueue *, UINT, ID3D12CommandList *const *);
 
 PresentFn *g_present = nullptr;
 ResizeBuffersFn *g_resize_buffers = nullptr;
+ResizeBuffers1Fn *g_resize_buffers1 = nullptr;
 ExecuteCommandListsFn *g_execute_command_lists = nullptr;
 
 HRESULT present_detour(IDXGISwapChain *swap_chain, const UINT sync_interval, const UINT flags)
@@ -48,6 +53,14 @@ HRESULT resize_buffers_detour(IDXGISwapChain *swap_chain, const UINT buffer_coun
 {
     Overlay::instance().before_resize();
     return g_resize_buffers(swap_chain, buffer_count, width, height, format, flags);
+}
+
+HRESULT resize_buffers1_detour(IDXGISwapChain3 *swap_chain, const UINT buffer_count, const UINT width,
+                               const UINT height, const DXGI_FORMAT format, const UINT flags,
+                               const UINT *node_masks, IUnknown *const *present_queues)
+{
+    Overlay::instance().before_resize();
+    return g_resize_buffers1(swap_chain, buffer_count, width, height, format, flags, node_masks, present_queues);
 }
 
 void execute_command_lists_detour(ID3D12CommandQueue *queue, const UINT count, ID3D12CommandList *const *lists)
@@ -74,7 +87,13 @@ struct ProbeWindow {
     ProbeWindow &operator=(const ProbeWindow &) = delete;
 };
 
-std::optional<std::pair<void *, void *>> probe_swap_chain()
+struct SwapChainEntryPoints {
+    void *present;
+    void *resize_buffers;
+    void *resize_buffers1;
+};
+
+std::optional<SwapChainEntryPoints> probe_swap_chain()
 {
     const ProbeWindow window;
     if (window.handle == nullptr) {
@@ -101,8 +120,13 @@ std::optional<std::pair<void *, void *>> probe_swap_chain()
         return std::nullopt;
     }
 
-    auto **vtable = *reinterpret_cast<void ***>(swap_chain.Get());
-    return std::pair{vtable[kPresentSlot], vtable[kResizeBuffersSlot]};
+    ComPtr<IDXGISwapChain3> versioned;
+    if (FAILED(swap_chain.As(&versioned))) {
+        return std::nullopt;
+    }
+
+    auto **vtable = *reinterpret_cast<void ***>(versioned.Get());
+    return SwapChainEntryPoints{vtable[kPresentSlot], vtable[kResizeBuffersSlot], vtable[kResizeBuffers1Slot]};
 }
 
 void *probe_command_queue()
@@ -142,11 +166,14 @@ void Overlay::install()
         throw std::runtime_error{"could not create a probe swap chain to read the DXGI vtable from"};
     }
 
-    resize_hook_ = FunctionHook{"IDXGISwapChain::ResizeBuffers", swap_chain->second,
+    resize_hook_ = FunctionHook{"IDXGISwapChain::ResizeBuffers", swap_chain->resize_buffers,
                                       reinterpret_cast<void *>(&resize_buffers_detour),
                                       reinterpret_cast<void **>(&g_resize_buffers)};
+    resize1_hook_ = FunctionHook{"IDXGISwapChain3::ResizeBuffers1", swap_chain->resize_buffers1,
+                                      reinterpret_cast<void *>(&resize_buffers1_detour),
+                                      reinterpret_cast<void **>(&g_resize_buffers1)};
     present_hook_ =
-        FunctionHook{"IDXGISwapChain::Present", swap_chain->first, reinterpret_cast<void *>(&present_detour),
+        FunctionHook{"IDXGISwapChain::Present", swap_chain->present, reinterpret_cast<void *>(&present_detour),
                            reinterpret_cast<void **>(&g_present)};
 
     install_mouse_hook();
@@ -156,6 +183,7 @@ void Overlay::shutdown()
 {
     present_hook_ = {};
     resize_hook_ = {};
+    resize1_hook_ = {};
     execute_hook_ = {};
     backend_.reset();
     input_.detach();

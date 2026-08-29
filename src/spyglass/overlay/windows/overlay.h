@@ -34,6 +34,7 @@ private:
 
     FunctionHook present_hook_;
     FunctionHook resize_hook_;
+    FunctionHook resize1_hook_;
     FunctionHook execute_hook_;
 
     std::unique_ptr<RenderBackend> backend_;
