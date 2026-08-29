@@ -3,9 +3,10 @@
 #include <exception>
 #include <format>
 
+#include "spyglass/error.h"
 #include "spyglass/network.h"
 #include "spyglass/overlay/install.h"
-#include "spyglass/error.h"
+#include "spyglass/overlay/store.h"
 
 namespace spyglass {
 namespace {
@@ -28,6 +29,7 @@ void attempt(const char *what, Step &&step)
 
 void install()
 {
+    attempt("stale captures", sweep_captures);
     attempt("overlay", install_overlay);
     attempt("packet hook", install_network_hook);
 }

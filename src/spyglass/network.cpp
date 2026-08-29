@@ -35,20 +35,6 @@ constexpr bool kBreakFirstSubChunk = false;
 constexpr int kSubChunkPacket = 174;
 std::atomic_bool g_broke_one{false};
 
-spyglass::Body body_of(const std::string_view data)
-{
-    return std::make_shared<const std::vector<std::uint8_t>>(data.begin(), data.end());
-}
-
-std::string name_of(const int id)
-{
-    const auto &names = spyglass::packet_names();
-    if (id < 0 || static_cast<std::size_t>(id) >= names.size()) {
-        return {};
-    }
-    return names[static_cast<std::size_t>(id)];
-}
-
 spyglass::Node node_of(const Bedrock::ErrorInfo<std::error_code> &info)
 {
     spyglass::Node node{.label = std::format("{} ({} {})", info.error.message(), info.error.category().name(),
@@ -91,10 +77,9 @@ void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::
 
     spyglass::View::getInstance().onPacketSend({
         .id = id,
-        .name = name_of(id),
         .decoded = header.asExpected().has_value(),
         .unread = header.asExpected().has_value() ? 0U : static_cast<std::uint32_t>(data.size()),
-        .body = body_of(std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size()))),
+        .body = std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size())),
     });
     SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::sendPacket, g_send_packet, this, data, reliability, compressible);
 }
@@ -116,12 +101,11 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
         stream.setReadPointer(view.size());
         spyglass::View::getInstance().onPacketReceive({
             .id = id,
-            .name = std::string{getName()},
+            .name = getName(),
             .decoded = broken.asExpected().has_value(),
             .unread = static_cast<std::uint32_t>(body.size() - truncated.getReadPointer()),
             .error = error_of(broken),
-            .fields = spyglass::decode_fields(*this, id),
-            .body = body_of(body),
+            .body = body,
         });
         return broken;
     }
@@ -130,13 +114,12 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
 
     spyglass::View::getInstance().onPacketReceive({
         .id = id,
-        .name = std::string{getName()},
+        .name = getName(),
         .decoded = result.asExpected().has_value(),
         .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
         .sub_id = static_cast<std::uint8_t>(sub_id),
         .error = error_of(result),
-        .fields = spyglass::decode_fields(*this, id),
-        .body = body_of(view.substr(std::min(begin, view.size()))),
+        .body = view.substr(std::min(begin, view.size())),
     });
     return result;
 }

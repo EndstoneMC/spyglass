@@ -25,5 +25,6 @@ void select_packet(Capture &capture, PacketList &list, std::uint64_t number);
 void show_packet(Capture &capture, PacketList &list, std::uint64_t number);
 void jump(Capture &capture, const Filter &filter, PacketList &list, Jump where);
 void find_packet(Capture &capture, const Filter &filter, PacketList &list, bool forward);
+void advance_find(Capture &capture, const Filter &filter, PacketList &list);
 
 }  // namespace spyglass

@@ -68,13 +68,23 @@ the packet it was reading, and jumps to one when you click it. It also reads the
 float, a varint and text. `Statistics` reports what the session captured, a breakdown per packet id with its share
 of the bytes, the distribution of packet lengths, and a graph of packets or bytes per second.
 
-Sent packets are captured as well as received ones, so a request and the answer to it sit in the same list. Spyglass
-holds the last 64 MB of bodies and drops the oldest beyond that, which is far more of a session than the packets
-worth scrolling back through, and bounds a resource pack download arriving inside the client's own address space.
-`Capture ▸ Options` sets those limits, and turns off capturing sent packets when only the server's half of the
+Sent packets are captured as well as received ones, so a request and the answer to it sit in the same list. The
+capture has no length limit. Packet bodies are written to a file as they arrive and read back when a packet is
+shown, so the first packet of a session is still there hours later and memory tracks the size of the index rather
+than the length of the capture. A list row costs 32 bytes, which is what a column is drawn from, and the index
+itself pages to disk once it passes its budget. `Capture ▸ Options` sets that budget, sets the size of the queue
+between the client's thread and the writer, and turns off capturing sent packets when only the server's half of the
 conversation is in question.
 
-The capture lives in the overlay and goes with the client when it closes. `File` writes what you ask it to under
+A packet arriving while that queue is full is dropped rather than made to wait, because the alternative is stalling
+the thread the client decodes packets on. The status bar counts the drops when there are any, next to the size of
+the capture on disk.
+
+The capture file is a scratch file, named like `spyglass_A1b2C3.cap` in the system temporary directory, and it goes
+when the client does. A file left behind by a client that crashed is removed the next time spyglass is injected: the
+running one holds a lock on its own file, so the sweep can tell a live capture from an abandoned one.
+
+`File` writes what you ask it to under
 `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher: the displayed packets as text or CSV,
 the selected packet's details or bytes, and a summary of the session. There is no file picker inside the client, so
 the name is generated and the menu says where the file landed.

@@ -42,9 +42,14 @@ void draw_properties(const Statistics &statistics)
     ImGui::Text("Packets captured: %llu", static_cast<unsigned long long>(statistics.total));
     ImGui::TextColored(statistics.bad == 0 ? ImGui::GetStyleColorVec4(ImGuiCol_Text) : kBadPacket,
                        "Failed decodes: %llu (%.1f%%)", static_cast<unsigned long long>(statistics.bad), share);
-    ImGui::Text("Packets retained: %zu (%zu bytes)", statistics.retained, statistics.retained_bytes);
-    ImGui::Text("Retained numbers: %llu to %llu", static_cast<unsigned long long>(statistics.oldest),
+    ImGui::Text("Packets on disk: %llu (%llu bytes)", static_cast<unsigned long long>(statistics.written),
+                static_cast<unsigned long long>(statistics.stored_bytes));
+    ImGui::Text("Numbers: %llu to %llu", static_cast<unsigned long long>(statistics.oldest),
                 static_cast<unsigned long long>(statistics.newest));
+    if (statistics.dropped != 0) {
+        ImGui::TextColored(kBadPacket, "Dropped by the writer: %llu",
+                           static_cast<unsigned long long>(statistics.dropped));
+    }
 
     ImGui::Separator();
     ImGui::Text("Received: %llu packets, %zu bytes", static_cast<unsigned long long>(statistics.inbound),

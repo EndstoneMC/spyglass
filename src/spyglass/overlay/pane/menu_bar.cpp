@@ -133,13 +133,13 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
         ImGui::Separator();
         if (ImGui::BeginMenu("Copy")) {
             if (ImGui::MenuItem("Row", nullptr, false, selected != 0)) {
-                if (const auto record = capture.selected_record()) {
-                    ImGui::SetClipboardText(report_row(*record).c_str());
+                if (const auto selection = capture.selected_details()) {
+                    ImGui::SetClipboardText(report_row(selection->record).c_str());
                 }
             }
             if (ImGui::MenuItem("Packet Details", nullptr, false, selected != 0)) {
-                if (const auto record = capture.selected_record()) {
-                    ImGui::SetClipboardText(report_details(*record).c_str());
+                if (const auto selection = capture.selected_details()) {
+                    ImGui::SetClipboardText(report_details(*selection).c_str());
                 }
             }
             ImGui::Separator();
@@ -158,7 +158,7 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
                 std::string text{kCsvHeader};
                 capture.visit(0, [&](const Record &record) {
                     if (filter.matches(record)) {
-                        text += report_csv(record);
+                        text += report_csv(capture.details(record.number));
                     }
                     return true;
                 });
@@ -234,22 +234,24 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
             jump(capture, filter, list, Jump::PreviousFailed);
         }
 
-        const auto selected = capture.selected_record();
+        const auto selected = capture.at_number(capture.selected());
         char next[192];
         char previous[192];
-        if (selected && !selected->name.empty()) {
-            std::snprintf(next, sizeof(next), "Next %s", selected->name.c_str());
-            std::snprintf(previous, sizeof(previous), "Previous %s", selected->name.c_str());
+        if (!selected.name.empty()) {
+            std::snprintf(next, sizeof(next), "Next %.*s", static_cast<int>(selected.name.size()),
+                          selected.name.data());
+            std::snprintf(previous, sizeof(previous), "Previous %.*s", static_cast<int>(selected.name.size()),
+                          selected.name.data());
         }
-        else if (selected && selected->id >= 0) {
-            std::snprintf(next, sizeof(next), "Next id %d", selected->id);
-            std::snprintf(previous, sizeof(previous), "Previous id %d", selected->id);
+        else if (selected.id >= 0) {
+            std::snprintf(next, sizeof(next), "Next id %d", selected.id);
+            std::snprintf(previous, sizeof(previous), "Previous id %d", selected.id);
         }
         else {
             std::snprintf(next, sizeof(next), "Next of This Packet");
             std::snprintf(previous, sizeof(previous), "Previous of This Packet");
         }
-        ImGui::BeginDisabled(!selected || selected->id < 0);
+        ImGui::BeginDisabled(selected.id < 0);
         if (ImGui::MenuItem(next)) {
             jump(capture, filter, list, Jump::NextSameId);
         }
@@ -367,23 +369,30 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
 void draw_capture_options(Capture &capture, bool &open)
 {
     if (ImGui::Begin("Spyglass: capture options", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        constexpr std::size_t kBlockBytes = kBlockEntries * sizeof(Entry);
         auto settings = capture.options();
-        auto records = static_cast<int>(settings.records);
-        auto megabytes = static_cast<int>(settings.bytes / (1024 * 1024));
+        auto index = static_cast<int>((settings.store.resident_blocks * kBlockBytes) / (1024 * 1024));
+        auto queue = static_cast<int>(settings.store.queue_bytes / (1024 * 1024));
 
-        ImGui::TextColored(kMuted, "The capture drops the oldest packet once either limit is reached.");
+        ImGui::TextColored(kMuted, "Packets stream to a capture file and are read back as they are shown, so\n"
+                                   "nothing is dropped for age and memory does not grow with the session.");
+        ImGui::TextColored(kMuted, "%s", capture.store().path().string().c_str());
+
+        ImGui::Separator();
         ImGui::SetNextItemWidth(160.0F);
-        ImGui::InputInt("Retained packets", &records, 1024, 8192);
+        ImGui::InputInt("Index cache (MB)", &index, 16, 128);
         ImGui::SetNextItemWidth(160.0F);
-        ImGui::InputInt("Retained megabytes", &megabytes, 8, 64);
+        ImGui::InputInt("Writer queue (MB)", &queue, 1, 8);
+        ImGui::TextColored(kMuted, "The queue holds packets the writer has not reached yet. A packet that\n"
+                                   "arrives when it is full is dropped and counted in the status bar.");
 
         ImGui::Separator();
         ImGui::Checkbox("Capture sent packets", &settings.outbound);
-        ImGui::TextColored(kMuted, "Sent packets are never stored while this is off, so the budget above\n"
-                                   "goes entirely to what the server sent.");
+        ImGui::TextColored(kMuted, "Sent packets are never stored while this is off.");
 
-        settings.records = static_cast<std::size_t>(std::max(records, 1));
-        settings.bytes = static_cast<std::size_t>(std::max(megabytes, 1)) * 1024 * 1024;
+        settings.store.resident_blocks =
+            std::max<std::size_t>(2, (static_cast<std::size_t>(std::max(index, 1)) * 1024 * 1024) / kBlockBytes);
+        settings.store.queue_bytes = static_cast<std::size_t>(std::max(queue, 1)) * 1024 * 1024;
         capture.set_options(settings);
     }
     ImGui::End();

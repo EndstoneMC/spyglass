@@ -163,13 +163,13 @@ std::string inspect(const std::span<const std::uint8_t> range)
 
 }  // namespace
 
-void draw_packet_bytes(const Record *const record, const std::uint64_t number, BytesView &view,
+void draw_packet_bytes(const Details *const details, const std::uint64_t number, BytesView &view,
                        const ViewOptions &options, const float height)
 {
-    const auto held = record != nullptr ? record->body : Body{};
+    const auto held = details != nullptr ? details->body : Body{};
     const std::span<const std::uint8_t> body = held ? std::span{*held} : std::span<const std::uint8_t>{};
-    const auto stopped = record != nullptr && !record->decoded
-                           ? body.size() - std::min<std::size_t>(record->unread, body.size())
+    const auto stopped = details != nullptr && !details->record.decoded
+                           ? body.size() - std::min<std::size_t>(details->record.unread, body.size())
                            : body.size();
 
     if (number != view.record) {
@@ -181,9 +181,9 @@ void draw_packet_bytes(const Record *const record, const std::uint64_t number, B
         view.match = -1;
         view.query_dirty = true;
         view.scroll_to_row =
-            record != nullptr && !record->decoded ? static_cast<long long>(stopped / kBytesPerRow) : 0;
+            details != nullptr && !details->record.decoded ? static_cast<long long>(stopped / kBytesPerRow) : 0;
     }
-    if (record == nullptr) {
+    if (details == nullptr) {
         view.selected = false;
         view.dragging = false;
         view.hovering = false;

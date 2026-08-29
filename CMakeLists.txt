@@ -38,6 +38,7 @@ add_library(spyglass SHARED
         src/spyglass/overlay/pane/status_bar.cpp
         src/spyglass/overlay/pane/toolbar.cpp
         src/spyglass/overlay/report.cpp
+        src/spyglass/overlay/store.cpp
         src/spyglass/overlay/view.cpp
         src/spyglass/overlay/windows/d3d11_backend.cpp
         src/spyglass/overlay/windows/d3d12_backend.cpp

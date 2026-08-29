@@ -13,6 +13,12 @@
 #include "spyglass/overlay/pane/packet_list.h"
 
 namespace spyglass {
+namespace {
+
+constexpr std::uint64_t kIndexScanBudget = 262144;
+constexpr std::uint64_t kBodyScanBudget = 4096;
+
+}  // namespace
 
 void select_packet(Capture &capture, PacketList &list, const std::uint64_t number)
 {
@@ -58,11 +64,11 @@ void jump(Capture &capture, const Filter &filter, PacketList &list, const Jump w
 
     auto id = -1;
     if (where == Jump::NextSameId || where == Jump::PreviousSameId) {
-        const auto selected = capture.selected_record();
-        if (!selected || selected->id < 0) {
+        const auto selected = capture.at_number(capture.selected());
+        if (selected.number == 0 || selected.id < 0) {
             return;
         }
-        id = selected->id;
+        id = selected.id;
     }
 
     const std::uint64_t from = relative ? capture.selected() : 0;
@@ -87,9 +93,38 @@ void jump(Capture &capture, const Filter &filter, PacketList &list, const Jump w
 void find_packet(Capture &capture, const Filter &filter, PacketList &list, const bool forward)
 {
     const std::string_view query{list.find.query};
+    list.find.missed = false;
+    list.find.scanning = false;
     if (query.empty()) {
         return;
     }
+
+    if (list.find.scope == FindScope::BodyHex || list.find.scope == FindScope::BodyText) {
+        std::vector<std::uint8_t> needle;
+        if (!parse_needle(query, list.find.scope == FindScope::BodyHex, needle) || needle.empty()) {
+            list.find.missed = true;
+            return;
+        }
+    }
+
+    list.find.forward = forward;
+    list.find.origin = capture.selected();
+    list.find.cursor = forward ? list.find.origin + 1 : 1;
+    list.find.found = 0;
+    list.find.scanned = 0;
+    list.find.total = capture.total();
+    list.find.scanning = true;
+    advance_find(capture, filter, list);
+}
+
+void advance_find(Capture &capture, const Filter &filter, PacketList &list)
+{
+    if (!list.find.scanning) {
+        return;
+    }
+
+    const std::string_view query{list.find.query};
+    const auto reads_body = list.find.scope == FindScope::BodyHex || list.find.scope == FindScope::BodyText;
 
     std::vector<std::uint8_t> needle;
     std::string wanted;
@@ -105,21 +140,22 @@ void find_packet(Capture &capture, const Filter &filter, PacketList &list, const
         break;
     case FindScope::BodyHex:
     case FindScope::BodyText:
-        if (!parse_needle(query, list.find.scope == FindScope::BodyHex, needle) || needle.empty()) {
-            list.find.missed = true;
-            return;
-        }
+        parse_needle(query, list.find.scope == FindScope::BodyHex, needle);
         break;
     }
 
-    const auto from = capture.selected();
-    std::uint64_t found = 0;
-    capture.visit(forward ? from + 1 : 0, [&](const Record &record) {
-        if (!forward && from != 0 && record.number >= from) {
+    const auto budget = reads_body ? kBodyScanBudget : kIndexScanBudget;
+    auto examined = std::uint64_t{0};
+    auto stopped = false;
+
+    const auto visited = capture.visit(list.find.cursor, [&](const Record &record) {
+        if (!list.find.forward && list.find.origin != 0 && record.number >= list.find.origin) {
+            stopped = true;
             return false;
         }
+        ++examined;
         if (!filter.matches(record)) {
-            return true;
+            return examined < budget;
         }
 
         auto hit = false;
@@ -136,22 +172,35 @@ void find_packet(Capture &capture, const Filter &filter, PacketList &list, const
             hit = record.id == id;
             break;
         case FindScope::BodyHex:
-        case FindScope::BodyText:
-            hit = record.body != nullptr &&
-                  std::search(record.body->begin(), record.body->end(), needle.begin(), needle.end()) !=
-                      record.body->end();
+        case FindScope::BodyText: {
+            const auto body = capture.details(record.number).body;
+            hit =
+                body != nullptr && std::search(body->begin(), body->end(), needle.begin(), needle.end()) != body->end();
             break;
         }
-        if (!hit) {
-            return true;
         }
-        found = record.number;
-        return !forward;
+        if (hit) {
+            list.find.found = record.number;
+            if (list.find.forward) {
+                stopped = true;
+                return false;
+            }
+        }
+        return examined < budget;
     });
 
-    list.find.missed = found == 0;
-    if (found != 0) {
-        show_packet(capture, list, found);
+    list.find.cursor = visited.next;
+    list.find.scanned = visited.next > 1 ? visited.next - 1 : 0;
+    list.find.total = std::max(list.find.total, visited.newest);
+
+    if (!stopped && visited.next <= visited.newest) {
+        return;
+    }
+
+    list.find.scanning = false;
+    list.find.missed = list.find.found == 0;
+    if (list.find.found != 0) {
+        show_packet(capture, list, list.find.found);
     }
 }
 

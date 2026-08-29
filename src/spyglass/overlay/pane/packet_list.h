@@ -25,6 +25,13 @@ struct PacketFind {
     char query[128]{};
     FindScope scope{FindScope::Name};
     bool missed{false};
+    bool scanning{false};
+    bool forward{true};
+    std::uint64_t cursor{0};
+    std::uint64_t origin{0};
+    std::uint64_t found{0};
+    std::uint64_t scanned{0};
+    std::uint64_t total{0};
 };
 
 struct PacketList {

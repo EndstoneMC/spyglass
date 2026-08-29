@@ -1,5 +1,6 @@
 #include "spyglass/overlay/capture.h"
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
@@ -22,14 +23,41 @@ double wall_now()
 
 }  // namespace
 
-void Capture::record(Record record)
+Record Capture::record_of(const std::uint64_t number, const Entry &entry)
 {
+    return {
+        .number = number,
+        .time = static_cast<double>(entry.time) / 1e6,
+        .name = interned_name(entry.id),
+        .length = entry.body_length,
+        .unread = entry.unread,
+        .id = entry.id,
+        .direction = (entry.flags & kOutbound) != 0 ? Direction::Outbound : Direction::Inbound,
+        .decoded = (entry.flags & kDecoded) != 0,
+        .sub_id = entry.sub_id,
+    };
+}
+
+void Capture::record(Incoming incoming, const Direction direction)
+{
+    {
+        const std::lock_guard lock{mutex_};
+        if (!running_) {
+            return;
+        }
+        if (!options_.outbound && direction == Direction::Outbound) {
+            ++rejected_;
+            return;
+        }
+    }
+
+    intern_name(incoming.id, incoming.name);
+
+    std::vector<std::uint8_t> blob;
+    pack(blob, incoming.body, incoming.error);
+
     const std::lock_guard lock{mutex_};
     if (!running_) {
-        return;
-    }
-    if (!options_.outbound && record.direction == Direction::Outbound) {
-        ++rejected_;
         return;
     }
     if (started_ < 0.0) {
@@ -37,15 +65,29 @@ void Capture::record(Record record)
         wall_started_ = wall_now();
     }
 
-    record.number = ++counter_;
-    record.time = now() - started_;
-    if (!record.decoded) {
+    const auto elapsed = now() - started_;
+    Entry entry{
+        .time = static_cast<std::uint64_t>(elapsed * 1e6),
+        .body_length = static_cast<std::uint32_t>(incoming.body.size()),
+        .blob_length = static_cast<std::uint32_t>(blob.size()),
+        .unread = incoming.unread,
+        .id = static_cast<std::int16_t>(incoming.id),
+        .sub_id = incoming.sub_id,
+        .flags = static_cast<std::uint8_t>((direction == Direction::Outbound ? kOutbound : 0U) |
+                                           (incoming.decoded ? kDecoded : 0U) | (incoming.error ? kHasError : 0U)),
+    };
+    if (!store_.push(entry, std::move(blob))) {
+        return;
+    }
+
+    const auto number = ++counter_;
+    const auto length = incoming.body.size();
+    if (!incoming.decoded) {
         ++bad_;
     }
 
-    const auto length = record.body ? record.body->size() : 0;
-    if (record.id >= 0) {
-        const auto id = static_cast<std::size_t>(record.id);
+    if (incoming.id >= 0) {
+        const auto id = static_cast<std::size_t>(incoming.id);
         if (id >= counts_.size()) {
             counts_.resize(id + 1, 0);
             id_bytes_.resize(id + 1, 0);
@@ -60,7 +102,7 @@ void Capture::record(Record record)
     }
     ++lengths_[bucket];
 
-    if (record.direction == Direction::Outbound) {
+    if (direction == Direction::Outbound) {
         ++outbound_;
         outbound_bytes_ += length;
     }
@@ -69,23 +111,31 @@ void Capture::record(Record record)
         inbound_bytes_ += length;
     }
 
-    const auto second = static_cast<std::size_t>(record.time);
+    const auto second = static_cast<std::size_t>(elapsed);
     if (second >= rates_.size()) {
         rates_.resize(second + 1);
     }
     ++rates_[second].packets;
     rates_[second].bytes += length;
 
-    bytes_ += length;
-    records_.push_back(std::move(record));
-    trim();
-}
-
-void Capture::trim()
-{
-    while (records_.size() > options_.records || (bytes_ > options_.bytes && records_.size() > 1)) {
-        bytes_ -= records_.front().body ? records_.front().body->size() : 0;
-        records_.pop_front();
+    if (incoming.error) {
+        const auto at = std::ranges::find_if(failures_, [&](const Failure &failure) {
+            return failure.id == incoming.id && failure.reason == incoming.error->label;
+        });
+        if (at == failures_.end()) {
+            failures_.push_back({
+                .reason = incoming.error->label,
+                .name = interned_name(incoming.id),
+                .id = incoming.id,
+                .count = 1,
+                .first = number,
+                .last = number,
+            });
+        }
+        else {
+            ++at->count;
+            at->last = number;
+        }
     }
 }
 
@@ -101,69 +151,66 @@ double Capture::wall_start() const
     return wall_started_;
 }
 
-const Record *Capture::find(const std::uint64_t number) const
-{
-    if (records_.empty() || number < records_.front().number) {
-        return nullptr;
-    }
-    const auto index = number - records_.front().number;
-    if (index >= records_.size()) {
-        return nullptr;
-    }
-    return &records_[static_cast<std::size_t>(index)];
-}
-
-Record *Capture::find(const std::uint64_t number)
-{
-    return const_cast<Record *>(std::as_const(*this).find(number));
-}
-
 Record Capture::at_number(const std::uint64_t number) const
 {
-    const std::lock_guard lock{mutex_};
-    if (const auto *record = find(number)) {
-        return *record;
+    Entry entry;
+    if (!store_.at(number, entry)) {
+        return {};
     }
-    return {};
+    return record_of(number, entry);
 }
 
-std::optional<Record> Capture::selected_record() const
+Details Capture::details(const std::uint64_t number) const
 {
-    const std::lock_guard lock{mutex_};
-    if (const auto *record = find(selected_)) {
-        return *record;
+    Entry entry;
+    if (!store_.at(number, entry)) {
+        return {};
     }
-    return std::nullopt;
+    auto blob = store_.read(entry);
+    return {.record = record_of(number, entry), .body = std::move(blob.body), .error = std::move(blob.error)};
+}
+
+std::optional<Details> Capture::selected_details() const
+{
+    auto found = details(selected());
+    if (found.record.number == 0) {
+        return std::nullopt;
+    }
+    return found;
 }
 
 std::optional<Node> Capture::fields(const std::uint64_t number)
 {
-    int id = -1;
-    Body body;
     {
-        const std::lock_guard lock{mutex_};
-        const auto *record = find(number);
-        if (record == nullptr) {
-            return std::nullopt;
+        const std::lock_guard lock{fields_mutex_};
+        if (const auto at = field_at_.find(number); at != field_at_.end()) {
+            fields_.splice(fields_.begin(), fields_, at->second);
+            return at->second->second;
         }
-        if (record->fields) {
-            return record->fields;
-        }
-        id = record->id;
-        body = record->body;
     }
 
-    if (!body) {
+    Entry entry;
+    if (!store_.at(number, entry)) {
         return std::nullopt;
     }
-    auto decoded = decode_body(id, {reinterpret_cast<const char *>(body->data()), body->size()})
+    const auto blob = store_.read(entry);
+    if (!blob.body) {
+        return std::nullopt;
+    }
+    auto decoded = decode_body(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()})
                        .value_or(Node{.label = "Fields"});
 
-    const std::lock_guard lock{mutex_};
-    if (auto *record = find(number); record != nullptr && record->body == body) {
-        record->fields = decoded;
+    const std::lock_guard lock{fields_mutex_};
+    if (const auto at = field_at_.find(number); at != field_at_.end()) {
+        return at->second->second;
     }
-    return decoded;
+    fields_.emplace_front(number, std::move(decoded));
+    field_at_[number] = fields_.begin();
+    while (fields_.size() > kFieldCache) {
+        field_at_.erase(fields_.back().first);
+        fields_.pop_back();
+    }
+    return fields_.front().second;
 }
 
 std::uint64_t Capture::bad() const
@@ -178,28 +225,54 @@ std::vector<std::uint64_t> Capture::counts() const
     return counts_;
 }
 
-Statistics Capture::statistics() const
+std::vector<Failure> Capture::failures() const
+{
+    const std::lock_guard lock{mutex_};
+    return failures_;
+}
+
+Counters Capture::counters() const
 {
     const std::lock_guard lock{mutex_};
     return {
         .total = counter_,
         .bad = bad_,
         .rejected = rejected_,
+        .dropped = store_.dropped(),
+        .written = store_.written(),
+        .stored_bytes = store_.stored_bytes(),
+    };
+}
+
+Statistics Capture::statistics() const
+{
+    const std::lock_guard lock{mutex_};
+    const auto written = store_.written();
+    return {
+        .total = counter_,
+        .bad = bad_,
+        .rejected = rejected_,
+        .dropped = store_.dropped(),
         .inbound = inbound_,
         .outbound = outbound_,
         .inbound_bytes = inbound_bytes_,
         .outbound_bytes = outbound_bytes_,
-        .retained = records_.size(),
-        .retained_bytes = bytes_,
-        .oldest = records_.empty() ? 0 : records_.front().number,
-        .newest = records_.empty() ? 0 : records_.back().number,
-        .duration = records_.empty() ? 0.0 : records_.back().time,
+        .written = written,
+        .stored_bytes = store_.stored_bytes(),
+        .oldest = written == 0 ? 0ULL : 1ULL,
+        .newest = written,
+        .duration = rates_.empty() ? 0.0 : static_cast<double>(rates_.size() - 1),
         .wall_start = wall_started_,
         .counts = counts_,
         .byte_counts = id_bytes_,
         .lengths = lengths_,
         .rates = rates_,
     };
+}
+
+const Store &Capture::store() const
+{
+    return store_;
 }
 
 std::uint64_t Capture::selected() const
@@ -234,10 +307,17 @@ void Capture::stop()
 
 void Capture::restart()
 {
+    {
+        const std::lock_guard lock{fields_mutex_};
+        fields_.clear();
+        field_at_.clear();
+    }
+
     const std::lock_guard lock{mutex_};
-    records_.clear();
+    store_.restart();
     counts_.clear();
     id_bytes_.clear();
+    failures_.clear();
     lengths_.fill(0);
     rates_.clear();
     counter_ = 0;
@@ -247,7 +327,6 @@ void Capture::restart()
     outbound_ = 0;
     inbound_bytes_ = 0;
     outbound_bytes_ = 0;
-    bytes_ = 0;
     started_ = -1.0;
     wall_started_ = 0.0;
     selected_ = 0;
@@ -267,7 +346,7 @@ void Capture::set_options(const CaptureOptions &options)
         return;
     }
     options_ = options;
-    trim();
+    store_.set_options(options.store);
 }
 
 }  // namespace spyglass

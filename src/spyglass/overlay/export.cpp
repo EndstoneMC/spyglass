@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <span>
@@ -33,16 +34,19 @@ std::string summary_of(const Capture &capture, const Filter &filter)
     });
 
     const auto statistics = capture.statistics();
-    const auto share = statistics.total == 0 ? 0.0
-                                             : (100.0 * static_cast<double>(statistics.bad)) /
-                                                   static_cast<double>(statistics.total);
+    const auto share = statistics.total == 0
+                           ? 0.0
+                           : (100.0 * static_cast<double>(statistics.bad)) / static_cast<double>(statistics.total);
 
     auto text = std::format("Spyglass {}\nClient: {}\n\n", SPYGLASS_VERSION, signatures().name);
     text += std::format("Duration: {:.3f} s\n", statistics.duration);
-    text += std::format("Packets captured: {}\nFailed decodes: {} ({:.1f}%)\n", statistics.total, statistics.bad,
-                        share);
-    text += std::format("Packets retained: {} ({} bytes, numbers {}..{})\n", statistics.retained,
-                        statistics.retained_bytes, statistics.oldest, statistics.newest);
+    text +=
+        std::format("Packets captured: {}\nFailed decodes: {} ({:.1f}%)\n", statistics.total, statistics.bad, share);
+    text += std::format("Packets on disk: {} ({} bytes, numbers {}..{})\n", statistics.written, statistics.stored_bytes,
+                        statistics.oldest, statistics.newest);
+    if (statistics.dropped != 0) {
+        text += std::format("Dropped by the writer: {}\n", statistics.dropped);
+    }
     text += std::format("Packets displayed: {}\n\n", displayed);
     text += std::format("Received: {} packets, {} bytes\n", statistics.inbound, statistics.inbound_bytes);
     text += std::format("Sent: {} packets, {} bytes\n", statistics.outbound, statistics.outbound_bytes);
@@ -53,63 +57,78 @@ std::string summary_of(const Capture &capture, const Filter &filter)
 
 std::string export_capture(const Capture &capture, const Filter &filter, const Export what, const BytesFormat bytes)
 {
-    std::string text;
-    std::string kind;
+    std::string kind = "packets";
     std::string extension = "txt";
+    if (what == Export::DisplayedCsv) {
+        extension = "csv";
+    }
+    else if (what == Export::SelectedDetails) {
+        kind = "packet";
+    }
+    else if (what == Export::SelectedBytes) {
+        kind = "bytes";
+    }
+    else if (what == Export::Summary) {
+        kind = "summary";
+    }
 
+    const auto path = output_directory() / std::format("spyglass-{}-{}.{}", stamp(), kind, extension);
+    std::ofstream file{path, std::ios::binary};
+    if (!file) {
+        return std::format("could not write {}", path.string());
+    }
+
+    std::uint64_t written = 0;
     switch (what) {
     case Export::DisplayedText:
-        kind = "packets";
         capture.visit(0, [&](const Record &record) {
             if (filter.matches(record)) {
-                text += report_details(record);
-                text += '\n';
+                file << report_details(capture.details(record.number)) << '\n';
+                ++written;
             }
             return true;
         });
         break;
     case Export::DisplayedCsv:
-        kind = "packets";
-        extension = "csv";
-        text = kCsvHeader;
+        file << kCsvHeader;
         capture.visit(0, [&](const Record &record) {
             if (filter.matches(record)) {
-                text += report_csv(record);
+                file << report_csv(capture.details(record.number));
+                ++written;
             }
             return true;
         });
         break;
     case Export::SelectedDetails:
-        kind = "packet";
-        if (const auto record = capture.selected_record()) {
-            text = report_details(*record);
+        if (const auto selection = capture.selected_details()) {
+            file << report_details(*selection);
+            ++written;
         }
         break;
     case Export::SelectedBytes:
-        kind = "bytes";
-        if (const auto record = capture.selected_record()) {
-            const std::span<const std::uint8_t> body = record->body ? std::span{*record->body}
-                                                                    : std::span<const std::uint8_t>{};
-            text = format_bytes(body, 0, bytes);
+        if (const auto selection = capture.selected_details()) {
+            const std::span<const std::uint8_t> body =
+                selection->body ? std::span{*selection->body} : std::span<const std::uint8_t>{};
+            file << format_bytes(body, 0, bytes);
+            ++written;
         }
         break;
     case Export::Summary:
-        kind = "summary";
-        text = summary_of(capture, filter);
+        file << summary_of(capture, filter);
+        ++written;
         break;
     }
 
-    if (text.empty()) {
+    const auto size = file.tellp();
+    file.close();
+    if (written == 0) {
+        std::filesystem::remove(path);
         return "nothing to export";
     }
-
-    const auto path = output_directory() / std::format("spyglass-{}-{}.{}", stamp(), kind, extension);
-    std::ofstream file{path, std::ios::binary};
-    file << text;
     if (!file) {
         return std::format("could not write {}", path.string());
     }
-    return std::format("wrote {} bytes to\n{}", text.size(), path.string());
+    return std::format("wrote {} bytes to\n{}", static_cast<std::uint64_t>(size), path.string());
 }
 
 }  // namespace spyglass

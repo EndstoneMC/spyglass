@@ -45,13 +45,14 @@ void draw_node(const ViewOptions &options, const Node &node, const int index)
 
 }  // namespace
 
-void draw_packet_details(Capture &capture, const Record *const record, ViewOptions &options, const float height)
+void draw_packet_details(Capture &capture, const Details *const details, ViewOptions &options, const float height)
 {
     ImGui::BeginChild("details", ImVec2{-1.0F, height}, ImGuiChildFlags_Borders);
 
-    if (record != nullptr) {
+    if (details != nullptr) {
+        const auto *const record = &details->record;
         const auto number = static_cast<unsigned long long>(record->number);
-        const std::size_t length = record->body ? record->body->size() : 0;
+        const std::size_t length = details->body ? details->body->size() : 0;
 
         set_open(options);
         if (ImGui::TreeNodeEx("frame", kBranch, "Frame %llu: %zu bytes captured at %.6f", number, length,
@@ -63,18 +64,15 @@ void draw_packet_details(Capture &capture, const Record *const record, ViewOptio
         }
 
         set_open(options);
-        if (ImGui::TreeNodeEx("packet", kBranch, "Bedrock Protocol: %s",
-                              record->name.empty() ? "unnamed" : record->name.c_str())) {
+        if (ImGui::TreeNodeEx("packet", kBranch, "Bedrock Protocol: %.*s",
+                              record->name.empty() ? 7 : static_cast<int>(record->name.size()),
+                              record->name.empty() ? "unnamed" : record->name.data())) {
             ImGui::TreeNodeEx("id", kLeaf, "Id: %d", record->id);
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
             }
-            std::optional<Node> lazy;
-            const Node *fields = record->fields ? &*record->fields : nullptr;
-            if (fields == nullptr) {
-                lazy = capture.fields(record->number);
-                fields = lazy ? &*lazy : nullptr;
-            }
+            const auto lazy = capture.fields(record->number);
+            const Node *const fields = lazy ? &*lazy : nullptr;
             if (fields != nullptr && !fields->children.empty()) {
                 int child = 0;
                 for (const auto &field : fields->children) {
@@ -87,13 +85,13 @@ void draw_packet_details(Capture &capture, const Record *const record, ViewOptio
             ImGui::TreePop();
         }
 
-        if (record->error) {
+        if (details->error) {
             const auto stopped = length - std::min<std::size_t>(record->unread, length);
             ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
             ImGui::SetNextItemOpen(true, ImGuiCond_Once);
             set_open(options);
             if (ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped)) {
-                draw_node(options, *record->error, 0);
+                draw_node(options, *details->error, 0);
                 ImGui::TreePop();
             }
             ImGui::PopStyleColor();

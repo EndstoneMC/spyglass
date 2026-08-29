@@ -25,8 +25,8 @@ public:
 
     void draw();
 
-    void onPacketSend(Record record);
-    void onPacketReceive(Record record);
+    void onPacketSend(Incoming incoming);
+    void onPacketReceive(Incoming incoming);
 
     void toggle() noexcept { visible_ = !visible_; }
     [[nodiscard]] bool visible() const noexcept { return visible_; }

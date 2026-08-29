@@ -56,14 +56,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read side by side.
 - `Help` says which client build was detected, which pattern set was chosen and where the hooks
   landed, which is what a bug report needs. The errors window moved under it.
-- `Capture` ▸ `Options` sets how much the capture keeps. The 65536 packet and 64 MB limits were
-  fixed; they are now yours to move. It also turns off capturing sent packets, which halves what a
-  session costs when only the server's half is in question. The status bar counts what was left out.
+- `Capture` ▸ `Options` sets the size of the index cache and of the queue between the client's thread
+  and the writer. It also turns off capturing sent packets, which halves what a session costs when
+  only the server's half is in question. The status bar counts what was left out.
+- The status bar reports how large the capture is on disk, and counts dropped packets when the client
+  produces them faster than the writer can store them.
+- Searching a packet body no longer blocks the client while it runs. The find bar shows how far it
+  has read and can be stopped.
+
+### Changed
+
+- The capture has no length limit. Packet bodies are written to a file as they arrive and read back
+  when a packet is shown, so a session runs until the disk fills rather than until a budget is spent,
+  and the first packet is still there hours later. What stays in memory is a 32 byte entry per packet,
+  which is everything a list row and the filter need, and that index pages to disk once it passes its
+  budget.
+- **BREAKING**: the retained packet and retained megabyte limits are gone, along with the settings
+  for them. Nothing is dropped for age any more, so there is nothing to size.
+- Fields are decoded when a packet is opened rather than when it arrives. Decoding every packet cost
+  the client's own thread the work of building a tree for packets nobody looked at.
 
 ### Fixed
 
 - Keyboard navigation could move focus onto `Restart` and wipe the capture. The capture buttons no
   longer take focus.
+- The expert information window and the status bar walked the whole capture every frame. They now
+  read a running tally.
 
 ## [0.2.0] - 2026-08-28
 

@@ -11,7 +11,7 @@
 
 namespace spyglass {
 
-struct Record;
+struct Details;
 struct ViewOptions;
 
 struct BytesView {
@@ -39,7 +39,7 @@ struct BytesView {
     float advance[95]{};
 };
 
-void draw_packet_bytes(const Record *record, std::uint64_t number, BytesView &view, const ViewOptions &options,
+void draw_packet_bytes(const Details *details, std::uint64_t number, BytesView &view, const ViewOptions &options,
                        float height);
 
 }  // namespace spyglass

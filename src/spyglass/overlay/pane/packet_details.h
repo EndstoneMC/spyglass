@@ -3,9 +3,9 @@
 namespace spyglass {
 
 class Capture;
-struct Record;
+struct Details;
 struct ViewOptions;
 
-void draw_packet_details(Capture &capture, const Record *record, ViewOptions &options, float height);
+void draw_packet_details(Capture &capture, const Details *details, ViewOptions &options, float height);
 
 }  // namespace spyglass

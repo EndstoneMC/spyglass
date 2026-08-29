@@ -4,39 +4,44 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
-#include <memory>
+#include <list>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
+#include "spyglass/overlay/store.h"
+
 namespace spyglass {
-
-enum class Direction : int {
-    Inbound = 0,
-    Outbound = 1,
-};
-
-using Body = std::shared_ptr<const std::vector<std::uint8_t>>;
-
-struct Node {
-    std::string label;
-    std::vector<Node> children;
-};
 
 struct Record {
     std::uint64_t number{0};
     double time{0.0};
-    Direction direction{Direction::Inbound};
+    std::string_view name;
+    std::size_t length{0};
+    std::uint32_t unread{0};
     int id{-1};
-    std::string name;
+    Direction direction{Direction::Inbound};
+    bool decoded{true};
+    std::uint8_t sub_id{0};
+};
+
+struct Details {
+    Record record;
+    Body body;
+    std::optional<Node> error;
+};
+
+struct Incoming {
+    int id{-1};
+    std::string_view name;
     bool decoded{true};
     std::uint32_t unread{0};
     std::uint8_t sub_id{0};
     std::optional<Node> error;
-    std::optional<Node> fields;
-    Body body;
+    std::string_view body;
 };
 
 struct Visited {
@@ -45,11 +50,20 @@ struct Visited {
     std::uint64_t next{0};
 };
 
+struct Failure {
+    std::string reason;
+    std::string_view name;
+    int id{-1};
+    std::uint64_t count{0};
+    std::uint64_t first{0};
+    std::uint64_t last{0};
+};
+
 constexpr std::size_t kLengthBuckets = 10;
+constexpr std::size_t kFieldCache = 256;
 
 struct CaptureOptions {
-    std::size_t records{65536};
-    std::size_t bytes{64 * 1024 * 1024};
+    StoreOptions store;
     bool outbound{true};
 
     bool operator==(const CaptureOptions &other) const = default;
@@ -60,16 +74,26 @@ struct Rate {
     std::size_t bytes{0};
 };
 
+struct Counters {
+    std::uint64_t total{0};
+    std::uint64_t bad{0};
+    std::uint64_t rejected{0};
+    std::uint64_t dropped{0};
+    std::uint64_t written{0};
+    std::uint64_t stored_bytes{0};
+};
+
 struct Statistics {
     std::uint64_t total{0};
     std::uint64_t bad{0};
     std::uint64_t rejected{0};
+    std::uint64_t dropped{0};
     std::uint64_t inbound{0};
     std::uint64_t outbound{0};
     std::size_t inbound_bytes{0};
     std::size_t outbound_bytes{0};
-    std::size_t retained{0};
-    std::size_t retained_bytes{0};
+    std::uint64_t written{0};
+    std::uint64_t stored_bytes{0};
     std::uint64_t oldest{0};
     std::uint64_t newest{0};
     double duration{0.0};
@@ -82,32 +106,34 @@ struct Statistics {
 
 class Capture {
 public:
-    void record(Record record);
+    void record(Incoming incoming, Direction direction);
 
-    template <typename Visitor>
-    Visited visit(const std::uint64_t first, Visitor &&visitor) const
+    template <typename Visitor> Visited visit(const std::uint64_t first, Visitor &&visitor) const
     {
-        const std::lock_guard lock{mutex_};
-        if (records_.empty()) {
+        const auto newest = store_.written();
+        if (newest == 0) {
             return {};
         }
-        const auto oldest = records_.front().number;
-        const auto newest = records_.back().number;
-        auto next = std::max(first, oldest);
-        while (next <= newest && visitor(records_[static_cast<std::size_t>(next - oldest)])) {
+        auto next = std::max<std::uint64_t>(first, 1);
+        Entry entry;
+        while (next <= newest && store_.at(next, entry) && visitor(record_of(next, entry))) {
             ++next;
         }
-        return {oldest, newest, next};
+        return {1, newest, next};
     }
 
     [[nodiscard]] std::uint64_t total() const;
     [[nodiscard]] double wall_start() const;
     [[nodiscard]] Record at_number(std::uint64_t number) const;
-    [[nodiscard]] std::optional<Record> selected_record() const;
+    [[nodiscard]] Details details(std::uint64_t number) const;
+    [[nodiscard]] std::optional<Details> selected_details() const;
     [[nodiscard]] std::optional<Node> fields(std::uint64_t number);
     [[nodiscard]] std::uint64_t bad() const;
     [[nodiscard]] std::vector<std::uint64_t> counts() const;
+    [[nodiscard]] std::vector<Failure> failures() const;
+    [[nodiscard]] Counters counters() const;
     [[nodiscard]] Statistics statistics() const;
+    [[nodiscard]] const Store &store() const;
 
     [[nodiscard]] std::uint64_t selected() const;
     void select(std::uint64_t number);
@@ -121,14 +147,14 @@ public:
     void set_options(const CaptureOptions &options);
 
 private:
-    [[nodiscard]] const Record *find(std::uint64_t number) const;
-    [[nodiscard]] Record *find(std::uint64_t number);
-    void trim();
+    [[nodiscard]] static Record record_of(std::uint64_t number, const Entry &entry);
+
+    Store store_;
 
     mutable std::mutex mutex_;
-    std::deque<Record> records_;
     std::vector<std::uint64_t> counts_;
     std::vector<std::size_t> id_bytes_;
+    std::vector<Failure> failures_;
     std::array<std::uint64_t, kLengthBuckets> lengths_{};
     std::vector<Rate> rates_;
     std::uint64_t counter_{0};
@@ -138,12 +164,15 @@ private:
     std::uint64_t outbound_{0};
     std::size_t inbound_bytes_{0};
     std::size_t outbound_bytes_{0};
-    std::size_t bytes_{0};
     double started_{-1.0};
     double wall_started_{0.0};
     std::uint64_t selected_{0};
     CaptureOptions options_;
     bool running_{true};
+
+    mutable std::mutex fields_mutex_;
+    mutable std::list<std::pair<std::uint64_t, Node>> fields_;
+    mutable std::unordered_map<std::uint64_t, std::list<std::pair<std::uint64_t, Node>>::iterator> field_at_;
 };
 
 }  // namespace spyglass

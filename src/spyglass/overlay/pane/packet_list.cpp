@@ -70,6 +70,7 @@ void draw_find_bar(Capture &capture, const Filter &filter, PacketList &list, Vie
                                          ImGuiInputTextFlags_EnterReturnsTrue);
     if (ImGui::IsItemEdited()) {
         list.find.missed = false;
+        list.find.scanning = false;
     }
 
     ImGui::SameLine();
@@ -82,7 +83,20 @@ void draw_find_bar(Capture &capture, const Filter &filter, PacketList &list, Vie
         find_packet(capture, filter, list, true);
     }
 
-    if (list.find.missed) {
+    advance_find(capture, filter, list);
+
+    if (list.find.scanning) {
+        ImGui::SameLine();
+        if (ImGui::Button("Stop")) {
+            list.find.scanning = false;
+            list.find.missed = list.find.found == 0;
+        }
+        ImGui::SameLine();
+        const auto share =
+            list.find.total == 0 ? 0.0F : static_cast<float>(list.find.scanned) / static_cast<float>(list.find.total);
+        ImGui::TextColored(kMuted, "searching %.0f%%", 100.0F * std::min(share, 1.0F));
+    }
+    else if (list.find.missed) {
         ImGui::SameLine();
         ImGui::TextColored(kBadPacket, "no match");
     }
@@ -189,8 +203,6 @@ void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOp
         options.resize_columns = false;
     }
 
-    // Only the visible rows are pulled out of the capture, so a table holding thousands of
-    // packets costs a few dozen brief locks a frame rather than a copy of the whole thing.
     auto selected = capture.selected();
     auto open_menu = false;
     const auto reference = list.reference == 0 ? 0.0 : capture.at_number(list.reference).time;
@@ -242,7 +254,7 @@ void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOp
             ImGui::TableNextColumn();
             ImGui::Text("%d", record.id);
             ImGui::TableNextColumn();
-            ImGui::Text("%u", static_cast<unsigned>(record.body ? record.body->size() : 0));
+            ImGui::Text("%u", static_cast<unsigned>(record.length));
 
             ImGui::TableNextColumn();
             const auto bad = options.colorize && !record.decoded;

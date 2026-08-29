@@ -12,44 +12,6 @@
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
-namespace {
-
-void rebuild(const Capture &capture, ExpertWindow &expert)
-{
-    expert.rows.clear();
-    const auto visited = capture.visit(0, [&](const Record &record) {
-        if (record.decoded || !record.error) {
-            return true;
-        }
-        const auto &reason = record.error->label;
-        const auto at = std::ranges::find_if(expert.rows, [&](const ExpertRow &row) {
-            return row.id == record.id && row.reason == reason;
-        });
-        if (at == expert.rows.end()) {
-            expert.rows.push_back({
-                .reason = reason,
-                .name = record.name,
-                .id = record.id,
-                .count = 1,
-                .first = record.number,
-                .last = record.number,
-            });
-        }
-        else {
-            ++at->count;
-            at->last = record.number;
-        }
-        return true;
-    });
-
-    std::ranges::sort(expert.rows, [](const ExpertRow &left, const ExpertRow &right) {
-        return left.count > right.count;
-    });
-    expert.seen = capture.bad();
-    expert.oldest = visited.oldest;
-}
-
-}  // namespace
 
 void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert, bool &open)
 {
@@ -59,12 +21,15 @@ void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert
         return;
     }
 
-    if (expert.seen != capture.bad() || expert.oldest != list.oldest) {
-        rebuild(capture, expert);
+    if (expert.seen != capture.bad()) {
+        expert.rows = capture.failures();
+        std::ranges::sort(expert.rows,
+                          [](const Failure &left, const Failure &right) { return left.count > right.count; });
+        expert.seen = capture.bad();
     }
 
     if (expert.rows.empty()) {
-        ImGui::TextColored(kMuted, "no failed decodes in the retained capture");
+        ImGui::TextColored(kMuted, "no failed decodes captured");
         ImGui::End();
         return;
     }
@@ -100,7 +65,7 @@ void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert
                 ImGui::Text("id %d", row.id);
             }
             else {
-                ImGui::TextUnformatted(row.name.c_str());
+                ImGui::TextUnformatted(row.name.data(), row.name.data() + row.name.size());
             }
             ImGui::TableNextColumn();
             ImGui::Text("%llu", static_cast<unsigned long long>(row.count));

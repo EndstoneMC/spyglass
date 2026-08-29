@@ -44,16 +44,14 @@ View &View::getInstance()
     return view;
 }
 
-void View::onPacketSend(Record record)
+void View::onPacketSend(Incoming incoming)
 {
-    record.direction = Direction::Outbound;
-    capture_.record(std::move(record));
+    capture_.record(std::move(incoming), Direction::Outbound);
 }
 
-void View::onPacketReceive(Record record)
+void View::onPacketReceive(Incoming incoming)
 {
-    record.direction = Direction::Inbound;
-    capture_.record(std::move(record));
+    capture_.record(std::move(incoming), Direction::Inbound);
 }
 
 void View::draw()
@@ -115,7 +113,7 @@ void View::draw()
                                ((pane_count + splitter_count - 1.0F) * ImGui::GetStyle().ItemSpacing.y));
         const float smallest = std::min(kPreferredMinimum, usable / pane_count);
 
-        const auto selected = capture_.selected_record();
+        const auto selected = capture_.selected_details();
         const auto *const record = selected ? &*selected : nullptr;
         const auto number = capture_.selected();
 
@@ -171,8 +169,8 @@ void View::draw()
         std::snprintf(title, sizeof(title), "Spyglass: packet %llu", static_cast<unsigned long long>(open.number));
         ImGui::SetNextWindowSize(ImVec2{640.0F, 520.0F}, ImGuiCond_FirstUseEver);
         if (ImGui::Begin(title, &open.open)) {
-            const auto pinned = capture_.at_number(open.number);
-            const auto *const record = pinned.number == 0 ? nullptr : &pinned;
+            const auto pinned = capture_.details(open.number);
+            const auto *const record = pinned.record.number == 0 ? nullptr : &pinned;
             draw_packet_details(capture_, record, options_, ImGui::GetContentRegionAvail().y * 0.4F);
             draw_packet_bytes(record, open.number, open.bytes, options_, ImGui::GetContentRegionAvail().y);
         }
