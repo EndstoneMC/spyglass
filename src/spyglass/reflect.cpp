@@ -23,6 +23,7 @@
 #include "bedrock/cereal/schema/basic_schema.h"
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
+#include "bedrock/nbt/compound_tag.h"
 #include "bedrock/network/packet.h"
 #include "bedrock/platform/uuid.h"
 #include "spyglass/network.h"
@@ -34,6 +35,7 @@ static_assert(entt::type_hash<cereal::internal::BasicSchema::TypeDescriptor>::va
 static_assert(entt::type_hash<cereal::internal::BasicSchema::MemberDescriptor>::value() == 0xBA234EDA);
 static_assert(entt::type_hash<cereal::internal::BasicSchema::GetterDescriptor>::value() == 0xBE28A3EF);
 static_assert(entt::type_hash<cereal::internal::BasicSchema::SetterDescriptor>::value() == 0x0AC66523);
+static_assert(entt::type_hash<CompoundTag>::value() == 0xBD1A8574);
 
 namespace {
 
@@ -142,6 +144,12 @@ std::string text_of(const entt::meta_any &value)
     if (const auto *v = value.try_cast<mce::UUID>()) {
         return std::format("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}", v->data[0] >> 32, (v->data[0] >> 16) & 0xFFFF,
                            v->data[0] & 0xFFFF, v->data[1] >> 48, v->data[1] & 0xFFFF'FFFF'FFFF);
+    }
+    if (const auto *v = value.try_cast<CompoundTag>()) {
+        if (value.type().size_of() != sizeof(CompoundTag)) {
+            return "<compound tag, layout not recognised>";
+        }
+        return std::format("<compound, {} entries>", v->size());
     }
     const auto *owned = value.try_cast<std::string>();
     const auto *viewed = owned != nullptr ? nullptr : value.try_cast<std::string_view>();
