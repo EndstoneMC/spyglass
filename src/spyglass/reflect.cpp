@@ -308,7 +308,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
                 : nullptr;
         const auto shown = std::min<std::size_t>(compound.size(), kMaxTagElements);
 
-        Node node{.label = std::format("CO {} [{}]", name, compound.size())};
+        Node node{.label = std::format("CO {}", name)};
         const CompoundTag::TagNode *pending[kMaxTreeDepth];
         int depth_left = 0;
         for (std::size_t i = 0; i < shown; ++i) {
