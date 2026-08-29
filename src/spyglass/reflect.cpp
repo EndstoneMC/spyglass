@@ -10,11 +10,14 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 #include <entt/core/any.hpp>
 #include <entt/core/type_info.hpp>
+#include <entt/locator/locator.hpp>
 #include <entt/meta/meta.hpp>
 #include <entt/meta/resolve.hpp>
+#include <entt/meta/template.hpp>
 
 #include "bedrock/cereal/context.h"
 #include "bedrock/cereal/schema/basic_schema.h"
@@ -293,18 +296,59 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         return;
     }
 
+    if (const auto *context = reflection_ctx(); context != nullptr && type.is_template_specialization()) {
+        const auto &meta_ctx = context->internal().mMetaCtx;
+        const auto tpl = type.template_type();
+
+        if (tpl == entt::resolve<entt::meta_class_template_tag<std::optional>>(meta_ctx)) {
+            const auto contained = type.template_arity() == 1 ? type.template_arg(0) : entt::meta_type{};
+            const auto *bytes = static_cast<const unsigned char *>(value.base().data());
+            if (bytes != nullptr && contained && contained.size_of() > 0 && contained.size_of() < type.size_of()) {
+                if (bytes[contained.size_of()] == 0) {
+                    parent.children.push_back({.label = std::format("{}: (none)", name)});
+                }
+                else {
+                    append(parent, contained.from_void(bytes), std::move(name), depth + 1);
+                }
+                return;
+            }
+        }
+
+        if (tpl == entt::resolve<entt::meta_class_template_tag<std::variant>>(meta_ctx)) {
+            const auto arity = type.template_arity();
+            std::size_t storage = 0;
+            for (std::size_t i = 0; i < arity; ++i) {
+                if (const auto alternative = type.template_arg(i)) {
+                    storage = std::max(storage, alternative.size_of());
+                }
+            }
+
+            const auto *bytes = static_cast<const unsigned char *>(value.base().data());
+            if (bytes != nullptr && storage > 0 && storage < type.size_of()) {
+                const std::size_t index = bytes[storage];
+                if (const auto alternative = index < arity ? type.template_arg(index) : entt::meta_type{}) {
+                    auto active = alternative.from_void(bytes);
+                    Node node{.label = std::format("{}: {}", name, alternative.info().name())};
+                    append_members(node, active, depth + 1);
+                    parent.children.push_back(std::move(node));
+                    return;
+                }
+            }
+        }
+    }
+
     if (type.is_class()) {
         Node node{.label = name};
         append_members(node, value, depth);
         if (node.children.empty()) {
-            node.label = std::format("{}: <class \"{}\" id {:#x} size {}>", name, type.name(), type.id(),
+            node.label = std::format("{}: <class \"{}\" id {:#x} size {}>", name, type.info().name(), type.id(),
                                      type.size_of());
         }
         parent.children.push_back(std::move(node));
         return;
     }
 
-    parent.children.push_back({.label = std::format("{}: <\"{}\" id {:#x} size {}{}{}>", name, type.name(), type.id(),
+    parent.children.push_back({.label = std::format("{}: <\"{}\" id {:#x} size {}{}{}>", name, type.info().name(), type.id(),
                                                     type.size_of(), type.is_enum() ? " enum" : "",
                                                     type.is_class() ? " class" : "")});
 }
@@ -312,6 +356,8 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
 const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ctx &meta_ctx)
 {
     static const auto types = [&meta_ctx] {
+        entt::locator<entt::meta_ctx>::reset(const_cast<entt::meta_ctx *>(&meta_ctx), [](entt::meta_ctx *) {});
+
         std::unordered_map<int, entt::meta_type> found;
         for (auto &&[type_id, type] : entt::resolve(meta_ctx)) {
             const cereal::internal::BasicSchema::TypeDescriptor *descriptor = type.custom();

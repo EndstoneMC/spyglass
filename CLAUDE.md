@@ -89,6 +89,62 @@ Every platform that ships is built in CI. A target nobody builds is a target tha
 broken. Release artifacts are the injector and the DLL for Windows, and the Android mod the Linux
 launcher loads.
 
+### Read the client, do not reason about it
+
+Every wrong answer costs an inject cycle; reading costs a minute. The declarations are in
+`bedrock-headers`, on the newest `<platform>/<version>` orphan branch, via `git show HEAD:<path>` —
+exact for layouts, member order, virtual order and enum values, and empty for function bodies. The
+layouts, vtable slots and call sites are in the IDA database at
+`bedrock-symbols/gamecore_x64_desktop/Minecraft.Windows.exe.i64`, which carries full PDB types, so
+nothing there needs to be inferred from a byte pattern.
+
+A vtable slot derived from declaration order is a guess until it has been read out of a real vtable.
+A member offset is a guess until it has been seen in code that uses it. Guesses that happen to be
+right are indistinguishable from guesses that are not, until the client dies holding one.
+
+### A mirrored type is only as good as its worst member
+
+`sizeof(std::vector<T>)` is 24 whatever `T` is, so a passing size assertion says nothing about an
+element type nobody has read. Mirror what has been read. Give everything else a type that cannot be
+walked — `void *` — so the next reader cannot mistake a placeholder for a description. A struct
+mirrored to hold an offset should look like it holds an offset.
+
+Pin what can be pinned. `entt::type_hash<T>::value()` is derived from the spelling of the type's
+name, so a `static_assert` on it checks the mirror's namespace, nesting and class-versus-struct
+against the client for free, at build time, before anything is dereferenced.
+
+### The client's meta context is not this module's
+
+EnTT keeps a default `meta_ctx` per module, in `entt::locator<entt::meta_ctx>`, and every `meta_any`
+and `meta_type` built without an explicit context binds to it. Inside `spyglass.dll` that context is
+empty, so anything relying on it — conversions, `allow_cast`, default-constructed handles — silently
+fails against types the client registered. Point the locator at the client's context once, before
+any walk:
+
+```cpp
+entt::locator<entt::meta_ctx>::reset(const_cast<entt::meta_ctx *>(&meta_ctx), [](entt::meta_ctx *) {});
+```
+
+The deleter is not optional. `mMetaCtx` is a subobject of the client's `ReflectionCtx`; the default
+`std::default_delete` would free memory the client owns.
+
+Also `meta_type::name()` is the *registered* name, which cereal usually does not set, and it renders
+as nothing. `info().name()` is the real type name and is always there.
+
+### Bound recursion at every function that recurses
+
+A depth guard on one function does not protect a sibling that also calls itself. The field walk
+guarded its value path, walked a packet's base chain with no guard and no depth increment, exhausted
+a 1 MB stack and took the client down. Guard each entry point, increment on every edge, and refuse
+to follow a cast that did not change the type.
+
+### One build at a time
+
+The build tree is shared with whatever else is open. Two ninja processes in one directory truncate
+`.ninja_deps`, and every later build starts from scratch; a build cannot write `spyglass.dll` while
+the client has it loaded. Check for a running build and a running client first. Do not reconfigure
+the tree with a different CMake than the one that generated it.
+
 ### Prose
 
 Flat, plain sentences. No marketing voice, no "powerful", no "seamlessly", no em-dash-joined
