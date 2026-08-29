@@ -240,10 +240,14 @@ std::string text_of(const entt::meta_any &value)
 #ifdef _WIN32
 constexpr int kMaxTagDepth = 16;
 constexpr int kMaxTreeDepth = 64;
+constexpr std::size_t kMaxTagElements = 64;
+constexpr int kMaxTagNodes = 4096;
+
+int g_tag_nodes = 0;
 
 void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::string_view name, const int depth)
 {
-    if (depth > kMaxTagDepth || ++g_nodes > kMaxNodes) {
+    if (depth > kMaxTagDepth || ++g_tag_nodes > kMaxTagNodes) {
         return;
     }
 
@@ -285,7 +289,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
     }
     case Tag::Type::List: {
         const auto &list = static_cast<const ListTag &>(tag);
-        const auto shown = list.mList.data() != nullptr ? std::min<std::size_t>(list.mList.size(), kMaxElements) : 0;
+        const auto shown = list.mList.data() != nullptr ? std::min<std::size_t>(list.mList.size(), kMaxTagElements) : 0;
         Node node{.label = std::format("LI {} [{}]", name, list.mList.size())};
         for (std::size_t i = 0; i < shown; ++i) {
             const Tag *element = list.mList[i].get();
@@ -306,7 +310,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
             head != nullptr && reinterpret_cast<std::uintptr_t>(head) % alignof(CompoundTag::TagNode) == 0
                 ? head->mParent
                 : nullptr;
-        const auto shown = std::min<std::size_t>(compound.size(), kMaxElements);
+        const auto shown = std::min<std::size_t>(compound.size(), kMaxTagElements);
 
         Node node{.label = std::format("CO {} [{}]", name, compound.size())};
         const CompoundTag::TagNode *pending[kMaxTreeDepth];
@@ -334,7 +338,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
     }
     case Tag::Type::IntArray: {
         const auto &data = static_cast<const IntArrayTag &>(tag).mData;
-        const auto shown = data.data() != nullptr ? std::min<std::size_t>(data.size(), kMaxElements) : 0;
+        const auto shown = data.data() != nullptr ? std::min<std::size_t>(data.size(), kMaxTagElements) : 0;
         Node node{.label = std::format("IA {} [{}]", name, data.size())};
         for (std::size_t i = 0; i < shown; ++i) {
             node.children.push_back({.label = std::format("IN [{}]: {}", i, data[i])});
@@ -425,6 +429,7 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
 #ifdef _WIN32
     if (const auto *tag = value.try_cast<CompoundTag>();
         tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
+        g_tag_nodes = 0;
         append_tag(parent, *tag, Tag::Type::Compound, name, 0);
         return;
     }
