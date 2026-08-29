@@ -114,6 +114,17 @@ public:
         std::optional<unsigned int> mScope;
         bool mIsDeprecatedComponent;
     };
+
+    struct GetterDescriptor {
+        std::unique_ptr<BasicSchema> mPtr;
+        cereal::ContextArea mAllowedAreas;
+    };
+
+    struct SetterDescriptor {
+        std::unique_ptr<BasicSchema> mPtr;
+        std::unique_ptr<Constraint> mConstraint;
+        cereal::ContextArea mAllowedAreas;
+    };
 };
 
 #ifdef _WIN32
@@ -125,6 +136,8 @@ static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE8);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mName) == 0x30);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mUserPropertiesMap) == 0x58);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mSerializationTraits) == 0xD8);
+static_assert(sizeof(BasicSchema::GetterDescriptor) == 0x10);
+static_assert(sizeof(BasicSchema::SetterDescriptor) == 0x18);
 #endif
 
 }  // namespace internal

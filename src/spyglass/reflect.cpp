@@ -32,6 +32,8 @@ namespace spyglass {
 
 static_assert(entt::type_hash<cereal::internal::BasicSchema::TypeDescriptor>::value() == 0xD4C25870);
 static_assert(entt::type_hash<cereal::internal::BasicSchema::MemberDescriptor>::value() == 0xBA234EDA);
+static_assert(entt::type_hash<cereal::internal::BasicSchema::GetterDescriptor>::value() == 0xBE28A3EF);
+static_assert(entt::type_hash<cereal::internal::BasicSchema::SetterDescriptor>::value() == 0x0AC66523);
 
 namespace {
 
@@ -409,6 +411,17 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
             parent.children.push_back({.label = std::format("{}: (none)", name)});
         }
         return;
+    }
+
+    for (auto &&[func_id, func] : type.func()) {
+        const cereal::internal::BasicSchema::GetterDescriptor *getter = func.custom();
+        if (getter == nullptr) {
+            continue;
+        }
+        if (auto serialized = func.invoke(value); serialized) {
+            append(parent, std::move(serialized), std::move(name), depth + 1);
+            return;
+        }
     }
 
     if (type.is_class()) {
