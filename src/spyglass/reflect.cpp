@@ -23,7 +23,19 @@
 #include "bedrock/cereal/schema/basic_schema.h"
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
+#include "bedrock/nbt/byte_array_tag.h"
+#include "bedrock/nbt/byte_tag.h"
 #include "bedrock/nbt/compound_tag.h"
+#include "bedrock/nbt/compound_tag_variant.h"
+#include "bedrock/nbt/double_tag.h"
+#include "bedrock/nbt/float_tag.h"
+#include "bedrock/nbt/int64_tag.h"
+#include "bedrock/nbt/int_array_tag.h"
+#include "bedrock/nbt/int_tag.h"
+#include "bedrock/nbt/list_tag.h"
+#include "bedrock/nbt/short_tag.h"
+#include "bedrock/nbt/string_tag.h"
+#include "bedrock/nbt/tag.h"
 #include "bedrock/network/packet.h"
 #include "bedrock/platform/uuid.h"
 #include "spyglass/network.h"
@@ -149,7 +161,8 @@ std::string text_of(const entt::meta_any &value)
         if (value.type().size_of() != sizeof(CompoundTag)) {
             return "<compound tag, layout not recognised>";
         }
-        return std::format("<compound, {} entries>", v->size());
+        const auto entries = v->size();
+        return std::format("<compound, {} {}>", entries, entries == 1 ? "entry" : "entries");
     }
     const auto *owned = value.try_cast<std::string>();
     const auto *viewed = owned != nullptr ? nullptr : value.try_cast<std::string_view>();
@@ -224,6 +237,121 @@ std::string text_of(const entt::meta_any &value)
     return {};
 }
 
+#ifdef _WIN32
+constexpr int kMaxTagDepth = 16;
+constexpr int kMaxTreeDepth = 64;
+
+void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::string_view name, const int depth)
+{
+    if (depth > kMaxTagDepth || ++g_nodes > kMaxNodes) {
+        return;
+    }
+
+    switch (type) {
+    case Tag::Type::End:
+        parent.children.push_back({.label = std::format("ED {}", name)});
+        return;
+    case Tag::Type::Byte:
+        parent.children.push_back({.label = std::format("BY {}: {}", name, static_cast<const ByteTag &>(tag).data)});
+        return;
+    case Tag::Type::Short:
+        parent.children.push_back({.label = std::format("SH {}: {}", name, static_cast<const ShortTag &>(tag).data)});
+        return;
+    case Tag::Type::Int:
+        parent.children.push_back({.label = std::format("IN {}: {}", name, static_cast<const IntTag &>(tag).data)});
+        return;
+    case Tag::Type::Int64:
+        parent.children.push_back({.label = std::format("LO {}: {}", name, static_cast<const Int64Tag &>(tag).data)});
+        return;
+    case Tag::Type::Float:
+        parent.children.push_back({.label = std::format("FL {}: {}", name, static_cast<const FloatTag &>(tag).data)});
+        return;
+    case Tag::Type::Double:
+        parent.children.push_back({.label = std::format("DO {}: {}", name, static_cast<const DoubleTag &>(tag).data)});
+        return;
+    case Tag::Type::ByteArray: {
+        const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
+        const auto *bytes = reinterpret_cast<const char *>(data.data());
+        const std::string_view raw =
+            bytes != nullptr ? std::string_view{bytes, std::min<std::size_t>(data.size(), kMaxText)}
+                             : std::string_view{};
+        parent.children.push_back({.label = std::format("BA {}: {}", name, blob_or_text(raw, data.size()))});
+        return;
+    }
+    case Tag::Type::String: {
+        const auto &data = static_cast<const StringTag &>(tag).data;
+        parent.children.push_back({.label = std::format("ST {}: {}", name, blob_or_text(data, data.size()))});
+        return;
+    }
+    case Tag::Type::List: {
+        const auto &list = static_cast<const ListTag &>(tag);
+        const auto shown = list.mList.data() != nullptr ? std::min<std::size_t>(list.mList.size(), kMaxElements) : 0;
+        Node node{.label = std::format("LI {} [{}]", name, list.mList.size())};
+        for (std::size_t i = 0; i < shown; ++i) {
+            const Tag *element = list.mList[i].get();
+            if (element != nullptr && reinterpret_cast<std::uintptr_t>(element) % alignof(Tag) == 0) {
+                append_tag(node, *element, list.mType, std::format("[{}]", i), depth + 1);
+            }
+        }
+        if (list.mList.size() > shown) {
+            node.children.push_back({.label = "..."});
+        }
+        parent.children.push_back(std::move(node));
+        return;
+    }
+    case Tag::Type::Compound: {
+        const auto &compound = static_cast<const CompoundTag &>(tag);
+        const auto *head = compound.head();
+        const auto *cursor =
+            head != nullptr && reinterpret_cast<std::uintptr_t>(head) % alignof(CompoundTag::TagNode) == 0
+                ? head->mParent
+                : nullptr;
+        const auto shown = std::min<std::size_t>(compound.size(), kMaxElements);
+
+        Node node{.label = std::format("CO {} [{}]", name, compound.size())};
+        const CompoundTag::TagNode *pending[kMaxTreeDepth];
+        int depth_left = 0;
+        for (std::size_t i = 0; i < shown; ++i) {
+            while (cursor != nullptr &&
+                   reinterpret_cast<std::uintptr_t>(cursor) % alignof(CompoundTag::TagNode) == 0 &&
+                   cursor->mIsNil == 0 && depth_left < kMaxTreeDepth) {
+                pending[depth_left++] = cursor;
+                cursor = cursor->mLeft;
+            }
+            if (depth_left == 0) {
+                break;
+            }
+            const auto *entry = pending[--depth_left];
+            append_tag(node, *entry->mValue, entry->mValue.index(),
+                       std::string_view{entry->mKey}.substr(0, kMaxText), depth + 1);
+            cursor = entry->mRight;
+        }
+        if (compound.size() > shown) {
+            node.children.push_back({.label = "..."});
+        }
+        parent.children.push_back(std::move(node));
+        return;
+    }
+    case Tag::Type::IntArray: {
+        const auto &data = static_cast<const IntArrayTag &>(tag).mData;
+        const auto shown = data.data() != nullptr ? std::min<std::size_t>(data.size(), kMaxElements) : 0;
+        Node node{.label = std::format("IA {} [{}]", name, data.size())};
+        for (std::size_t i = 0; i < shown; ++i) {
+            node.children.push_back({.label = std::format("IN [{}]: {}", i, data[i])});
+        }
+        if (data.size() > shown) {
+            node.children.push_back({.label = "..."});
+        }
+        parent.children.push_back(std::move(node));
+        return;
+    }
+    default:
+        parent.children.push_back({.label = std::format("?? {}: <tag type {}>", name, static_cast<int>(type))});
+        return;
+    }
+}
+#endif
+
 void append(Node &parent, entt::meta_any value, std::string name, int depth);
 
 void append_members(Node &node, entt::meta_any &value, const int depth)
@@ -293,6 +421,14 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
     if (!value || depth > kMaxDepth || ++g_nodes > kMaxNodes) {
         return;
     }
+
+#ifdef _WIN32
+    if (const auto *tag = value.try_cast<CompoundTag>();
+        tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
+        append_tag(parent, *tag, Tag::Type::Compound, name, 0);
+        return;
+    }
+#endif
 
     if (const auto text = text_of(value); !text.empty()) {
         parent.children.push_back({.label = std::format("{}: {}", name, text)});
