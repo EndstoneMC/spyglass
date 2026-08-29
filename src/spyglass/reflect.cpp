@@ -233,7 +233,6 @@ std::string text_of(const entt::meta_any &value)
 }
 
 constexpr int kMaxTagDepth = 16;
-constexpr std::size_t kMaxTagElements = 64;
 constexpr int kMaxTagNodes = 4096;
 
 int g_tag_nodes = 0;
@@ -282,7 +281,7 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
     }
     case Tag::Type::List: {
         const auto &list = static_cast<const ListTag &>(tag);
-        const auto shown = list.mList.data() != nullptr ? std::min<std::size_t>(list.mList.size(), kMaxTagElements) : 0;
+        const auto shown = list.mList.data() != nullptr ? list.mList.size() : 0;
         Node node{.label = std::format("{} [{}]", name, list.mList.size())};
         for (std::size_t i = 0; i < shown; ++i) {
             const Tag *element = list.mList[i].get();
@@ -290,37 +289,24 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
                 append_tag(node, *element, list.mType, std::format("[{}]", i), depth + 1);
             }
         }
-        if (list.mList.size() > shown) {
-            node.children.push_back({.label = "..."});
-        }
         parent.children.push_back(std::move(node));
         return;
     }
     case Tag::Type::Compound: {
         const auto &tags = static_cast<const CompoundTag &>(tag).rawView();
-        const auto shown = std::min<std::size_t>(tags.size(), kMaxTagElements);
-
-        Node node{.label = std::format("{}", name)};
-        auto entry = tags.begin();
-        for (std::size_t i = 0; i < shown && entry != tags.end(); ++i, ++entry) {
-            append_tag(node, *entry->second, entry->second.index(),
-                       std::string_view{entry->first}.substr(0, kMaxText), depth + 1);
-        }
-        if (tags.size() > shown) {
-            node.children.push_back({.label = "..."});
+        Node node{.label = std::string{name}};
+        for (const auto &[key, value] : tags) {
+            append_tag(node, *value, value.index(), std::string_view{key}.substr(0, kMaxText), depth + 1);
         }
         parent.children.push_back(std::move(node));
         return;
     }
     case Tag::Type::IntArray: {
         const auto &data = static_cast<const IntArrayTag &>(tag).mData;
-        const auto shown = data.data() != nullptr ? std::min<std::size_t>(data.size(), kMaxTagElements) : 0;
+        const auto shown = data.data() != nullptr ? data.size() : 0;
         Node node{.label = std::format("{} [{}]", name, data.size())};
         for (std::size_t i = 0; i < shown; ++i) {
             node.children.push_back({.label = std::format("[{}]: {}", i, data[i])});
-        }
-        if (data.size() > shown) {
-            node.children.push_back({.label = "..."});
         }
         parent.children.push_back(std::move(node));
         return;

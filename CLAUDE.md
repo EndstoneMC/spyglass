@@ -113,6 +113,26 @@ Pin what can be pinned. `entt::type_hash<T>::value()` is derived from the spelli
 name, so a `static_assert` on it checks the mirror's namespace, nesting and class-versus-struct
 against the client for free, at build time, before anything is dereferenced.
 
+### Declare the type, never the layout
+
+Write the client's type as the client declares it and let the compiler lay it out. Both platforms
+build against the same standard library the client was built with — MSVC's STL under clang-cl,
+libc++ on Android — so a faithfully declared `std::map`, `std::variant`, `std::string` or
+`std::vector` has the client's layout exactly, and can be iterated, visited and indexed like any
+other. `endstone/src/bedrock/nbt/` is the reference for what that looks like, including the
+forward-declare and bottom-include shape that resolves a circular type.
+
+Never hand-roll the walk. A mirrored red-black node with `void *` links and hand-read offsets, a
+`std::variant` faked as a byte array plus a discriminant, a hand-computed field offset — all of it is
+a reimplementation of something the compiler already does correctly, and every offset in it is a
+guess that has to be re-checked on every client update. The NBT tree was written that way once. It
+cost a node mirror, a manual discriminant read, and a `#ifdef _WIN32` that left Android unable to
+read NBT at all, and the faithful version deleted all three and was shorter.
+
+This does not soften the rule above. Mirror only the members that have been read, and give the rest
+`void *` — but write the ones you do mirror as their real types, and assert the size on both
+platforms so a layout that does not match fails the build rather than the client.
+
 ### The client's meta context is not this module's
 
 EnTT keeps a default `meta_ctx` per module, in `entt::locator<entt::meta_ctx>`, and every `meta_any`
