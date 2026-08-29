@@ -23,6 +23,7 @@
 #include "bedrock/cereal/schema/basic_schema.h"
 #include "bedrock/core/string/string_hash.h"
 #include "bedrock/core/utility/binary_stream.h"
+#include "bedrock/nbt/byte_array_tag.h"
 #include "bedrock/nbt/compound_tag.h"
 #include "bedrock/nbt/list_tag.h"
 #include "bedrock/nbt/tag.h"
@@ -242,17 +243,29 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
     case Tag::Type::Int64:
     case Tag::Type::Float:
     case Tag::Type::Double:
-    case Tag::Type::ByteArray:
     case Tag::Type::String:
     case Tag::Type::IntArray: {
         const auto value = tag.toString();
         parent.children.push_back({.label = std::format("{}: {}", name, std::string_view{value}.substr(0, kMaxText))});
         return;
     }
+    case Tag::Type::ByteArray: {
+        const auto summary = tag.toString();
+        const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
+        const auto *bytes = reinterpret_cast<const char *>(data.data());
+        const std::string_view raw =
+            bytes != nullptr ? std::string_view{bytes, std::min<std::size_t>(data.size(), kMaxText)}
+                             : std::string_view{};
+        Node node{.label = std::format("{}: {}", name, std::string_view{summary}.substr(0, kMaxText))};
+        node.children.push_back({.label = blob_or_text(raw, data.size())});
+        parent.children.push_back(std::move(node));
+        return;
+    }
     case Tag::Type::List: {
+        const auto summary = tag.toString();
         const auto &list = static_cast<const ListTag &>(tag);
         const auto shown = list.mList.data() != nullptr ? list.mList.size() : 0;
-        Node node{.label = std::format("{} [{}]", name, list.mList.size())};
+        Node node{.label = std::format("{}: {}", name, std::string_view{summary}.substr(0, kMaxText))};
         for (std::size_t i = 0; i < shown; ++i) {
             const Tag *element = list.mList[i].get();
             if (element != nullptr && reinterpret_cast<std::uintptr_t>(element) % alignof(Tag) == 0) {
@@ -263,8 +276,9 @@ void append_tag(Node &parent, const Tag &tag, const Tag::Type type, const std::s
         return;
     }
     case Tag::Type::Compound: {
+        const auto summary = tag.toString();
         const auto &tags = static_cast<const CompoundTag &>(tag).rawView();
-        Node node{.label = std::string{name}};
+        Node node{.label = std::format("{}: {}", name, std::string_view{summary}.substr(0, kMaxText))};
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), std::string_view{key}.substr(0, kMaxText), depth + 1);
         }
