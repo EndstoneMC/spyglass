@@ -401,6 +401,16 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         }
     }
 
+    if (type.is_pointer_like()) {
+        if (auto pointed = *value; pointed) {
+            append(parent, std::move(pointed), std::move(name), depth + 1);
+        }
+        else {
+            parent.children.push_back({.label = std::format("{}: (none)", name)});
+        }
+        return;
+    }
+
     if (type.is_class()) {
         const auto bases = type.base();
         const auto members = type.data();
