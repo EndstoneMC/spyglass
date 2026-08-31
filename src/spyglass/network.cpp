@@ -31,6 +31,7 @@ namespace {
 void *g_send_packet = nullptr;
 void *g_read_no_header = nullptr;
 void *g_network_system_send = nullptr;
+void *g_network_system_send_multiple = nullptr;
 void *g_create_packet = nullptr;
 std::atomic<const cereal::ReflectionCtx *> g_reflection{nullptr};
 spyglass::Hooks g_hooks;
@@ -90,26 +91,39 @@ Bedrock::Result<void> read_packet_header(ReadOnlyBinaryStream &stream, int &id)
     return {};
 }
 
-void NetworkSystem::send(const NetworkIdentifier &id, const Packet &packet, const SubClientId recipient)
+void record_sent(const Packet &packet, const std::string_view written, const SubClientId recipient)
 {
-    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::send, g_network_system_send, this, id, packet, recipient);
+    if (!g_rich_send.load(std::memory_order_relaxed)) {
+        return;
+    }
 
-    const auto written = sendStream().written();
     ReadOnlyBinaryStream stream{written, false};
-    auto packet_id = -1;
-    read_packet_header(stream, packet_id);
+    const auto header = stream.getUnsignedVarInt();
+    const auto id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1;
 
     spyglass::View::getInstance().onPacketSend({
-        .id = packet_id,
+        .id = id,
         .name = packet.getName(),
-        .decoded = packet_id >= 0,
+        .decoded = header.asExpected().has_value(),
         .unread = 0,
         .sub_id = static_cast<std::uint8_t>(recipient),
-        .fields = spyglass::decode_mode(packet.getName(), packet_id) == spyglass::DecodeMode::Eager
-                      ? spyglass::decode_fields(const_cast<Packet &>(packet), packet_id)
+        .fields = spyglass::decode_mode(packet.getName(), id) == spyglass::DecodeMode::Eager
+                      ? spyglass::decode_fields(const_cast<Packet &>(packet), id)
                       : nlohmann::ordered_json{},
         .body = written.substr(std::min(stream.getReadPointer(), written.size())),
     });
+}
+
+void NetworkSystem::send(const NetworkIdentifier &id, const Packet &packet, const SubClientId recipient)
+{
+    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::send, g_network_system_send, this, id, packet, recipient);
+    record_sent(packet, sendStream().written(), recipient);
+}
+
+void NetworkSystem::sendToMultiple(const std::vector<NetworkIdentifierWithSubId> &ids, const Packet &packet)
+{
+    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::sendToMultiple, g_network_system_send_multiple, this, ids, packet);
+    record_sent(packet, sendStream().written(), SubClientId::PrimaryClient);
 }
 
 void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::Reliability reliability,
@@ -191,10 +205,13 @@ void install_network_hook()
     static FunctionHook read{"Packet::readNoHeader", g_hooks.read_no_header, detail::fp_cast(&Packet::readNoHeader),
                              &g_read_no_header};
 
-    if (!signature.network_system_send.empty()) {
+    if (!signature.network_system_send.empty() && !signature.network_system_send_multiple.empty()) {
         g_hooks.network_system_send = find(signature.network_system_send);
-        static FunctionHook send_stream{"NetworkSystem::send", g_hooks.network_system_send,
-                                        detail::fp_cast(&NetworkSystem::send), &g_network_system_send};
+        g_hooks.network_system_send_multiple = find(signature.network_system_send_multiple);
+        static FunctionHook sent{"NetworkSystem::send", g_hooks.network_system_send,
+                                 detail::fp_cast(&NetworkSystem::send), &g_network_system_send};
+        static FunctionHook sent_many{"NetworkSystem::sendToMultiple", g_hooks.network_system_send_multiple,
+                                      detail::fp_cast(&NetworkSystem::sendToMultiple), &g_network_system_send_multiple};
         g_rich_send.store(true, std::memory_order_relaxed);
     }
 }

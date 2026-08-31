@@ -28,6 +28,9 @@
 //    writeWithSerializationMode with the stream and the reflection context
 // 3. the prologue pushes eight registers, reserves 0x108 and spills the four arguments before
 //    copying the 0xb0 byte NetworkIdentifier. that run is unique up to the call operand
+// 4. the string has a second xref, sendToMultiple, which serialises the same way for each
+//    distinct recipient sub id. both are hooked, so every header a packet is written with
+//    is seen
 //
 //
 // 1. find the string "readNoHeader failed! packetId: {}". it is unique on both platforms, in
@@ -92,6 +95,7 @@ struct Signatures {
     std::string_view batched_send_packet;
     std::string_view packet_read_no_header;
     std::string_view network_system_send;
+    std::string_view network_system_send_multiple;
     std::string_view create_packet;
     int max_packet_id;
 };
@@ -112,6 +116,9 @@ constexpr Signatures kClient{
     .network_system_send = "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC 08 01 00 00 48 8D AC 24 80 00 00 00 48 C7 85 "
                            "80 00 00 00 FE FF FF FF 45 89 CD 4C 89 C6 48 89 D7 48 89 CB 48 8D 4D B0 41 B8 B0 00 "
                            "00 00 E8",
+    .network_system_send_multiple =
+        "41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC 38 48 8B 05 ? ? ? ? 48 31 E0 48 89 44 24 30 "
+        "48 8B 02 48 3B 42 08 0F 84 ? ? ? ? 4C 89 C6 49 89 D6 48 89 CF",
     .packet_read_no_header = "55 41 56 56 57 53 48 81 EC 20 01 00 00 48 8D AC 24 80 00 00 00 0F 29 B5 90 00 00 00 48 "
                              "C7 85 88 00 00 00 FE FF FF FF 48 89 D6 48 8B 85 F0 00",
     .create_packet = "56 48 83 EC 30 48 89 CE 81 FA 61 01 00 00 0F 87 ? ? ? ? 89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 "
@@ -129,6 +136,9 @@ constexpr Signatures kClient{
     .network_system_send = "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC 08 01 00 00 48 8D AC 24 80 00 00 00 48 C7 85 "
                            "80 00 00 00 FE FF FF FF 45 89 CD 4C 89 C6 48 89 D7 48 89 CB 48 8D 4D B0 41 B8 B0 00 "
                            "00 00 E8",
+    .network_system_send_multiple =
+        "41 57 41 56 41 55 41 54 56 57 55 53 48 83 EC 38 48 8B 05 ? ? ? ? 48 31 E0 48 89 44 24 30 "
+        "48 8B 02 48 3B 42 08 0F 84 ? ? ? ? 4C 89 C6 49 89 D6 48 89 CF",
     .packet_read_no_header = "55 41 56 56 57 53 48 81 EC 20 01 00 00 48 8D AC 24 80 00 00 00 0F 29 B5 90 00 00 00 48 "
                              "C7 85 88 00 00 00 FE FF FF FF 48 89 D6 48 8B 85 F0 00",
     .create_packet = "56 48 83 EC 20 48 89 CE 81 FA 5F 01 00 00 77 ? 89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 C8 FF E0 "
@@ -157,6 +167,7 @@ constexpr Signatures kClient{
                            "25 28 00 00 00 48 89 45 D0 48 83 C7 18 44 0F B6 3E 41 F6 C7 01 74 06 4D 8B 66 08 EB 06 45 "
                            "89 FC 41 D1 EC",
     .network_system_send = {},
+    .network_system_send_multiple = {},
     .packet_read_no_header = "55 48 89 E5 41 57 41 56 41 54 53 48 81 EC E0 00 00 00 48 89 FB 64 48 8B 04 25 28 00 00 "
                              "00 48 89 45 D8 41 0F B6 00 88 46 10 48 8B 06 48 8D BD 48 FF FF FF FF 50 48 0F B6 45 88 "
                              "88 45 D0 84 C0 74 07",
