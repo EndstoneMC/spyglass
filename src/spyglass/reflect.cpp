@@ -1,6 +1,7 @@
 #include "spyglass/reflect.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -248,7 +249,6 @@ void put(nlohmann::ordered_json &parent, std::string name, nlohmann::ordered_jso
     entries.emplace_back(std::move(name), std::move(value));
 }
 
-constexpr int kDeepestType = 24;
 constexpr int kMaxTagDepth = 16;
 constexpr int kMaxTagNodes = 4096;
 
@@ -582,39 +582,6 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
                     type.is_enum() ? " enum" : "", type.is_class() ? " class" : ""));
 }
 
-bool holds_item(const entt::meta_type &type, std::unordered_set<entt::id_type> &seen, const int depth)
-{
-    if (!type || depth > kDeepestType) {
-        return false;
-    }
-
-    const std::string_view name = type.info().name();
-    if (name.find("NetworkItemStackDescriptor") != std::string_view::npos ||
-        name.find("NetworkItemInstanceDescriptor") != std::string_view::npos) {
-        return true;
-    }
-    if (!seen.insert(type_key(type)).second) {
-        return false;
-    }
-
-    for (std::size_t at = 0; at < type.template_arity(); ++at) {
-        if (holds_item(type.template_arg(at), seen, depth + 1)) {
-            return true;
-        }
-    }
-    for (auto &&[base_id, base] : type.base()) {
-        if (holds_item(base.type(), seen, depth + 1)) {
-            return true;
-        }
-    }
-    for (auto &&[member_id, data] : type.data()) {
-        if (holds_item(data.type(), seen, depth + 1)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ctx &meta_ctx)
 {
     static const auto types = [&meta_ctx] {
@@ -642,23 +609,17 @@ const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ct
 
 }  // namespace
 
-bool needs_live_registry(const int id)
+bool needs_live_registry(const std::string_view name)
 {
-    static const auto marked = [] {
-        std::unordered_set<int> found;
-        const auto *ctx = reflection_ctx();
-        if (ctx == nullptr) {
-            return found;
-        }
-        for (const auto &[packet_id, type] : packet_types(ctx->internal().mMetaCtx)) {
-            std::unordered_set<entt::id_type> seen;
-            if (holds_item(type, seen, 0)) {
-                found.insert(packet_id);
-            }
-        }
-        return found;
-    }();
-    return marked.contains(id);
+    constexpr std::array<std::string_view, 18> kItemPackets{
+        "AddActorPacket",          "AddItemActorPacket",      "AddPlayerPacket",
+        "CraftingDataPacket",      "CraftingEventPacket",     "CreativeContentPacket",
+        "InventoryContentPacket",  "InventorySlotPacket",     "InventoryTransactionPacket",
+        "ItemComponentPacket",     "ItemRegistryPacket",      "ItemStackRequestPacket",
+        "ItemStackResponsePacket", "MobArmorEquipmentPacket", "MobEquipmentPacket",
+        "PlayerAuthInputPacket",   "StartGamePacket",         "UpdateTradePacket",
+    };
+    return std::ranges::find(kItemPackets, name) != kItemPackets.end();
 }
 
 nlohmann::ordered_json decode_fields(Packet &packet, const int id)

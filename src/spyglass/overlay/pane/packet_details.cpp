@@ -124,17 +124,23 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
             }
-            const auto fields = capture.fields(record->number);
-            if (fields && fields->is_object() && !fields->empty()) {
-                std::string text;
-                auto child = 0;
-                for (const auto &[name, held] : fields->items()) {
-                    draw_node(options, text, name, held, child++, 0);
+            ImGui::PushID(static_cast<int>(record->number));
+            set_open(options);
+            if (ImGui::TreeNodeEx("fields", kBranch, "Fields")) {
+                const auto fields = capture.fields(record->number);
+                if (fields && fields->is_object() && !fields->empty()) {
+                    std::string text;
+                    auto child = 0;
+                    for (const auto &[name, held] : fields->items()) {
+                        draw_node(options, text, name, held, child++, 0);
+                    }
                 }
+                else {
+                    ImGui::TreeNodeEx("unavailable", kLeaf, "no fields decoded");
+                }
+                ImGui::TreePop();
             }
-            else {
-                ImGui::TreeNodeEx("unavailable", kLeaf, "no fields decoded");
-            }
+            ImGui::PopID();
             ImGui::TreePop();
         }
 
