@@ -28,20 +28,7 @@ namespace {
 
 constexpr auto kJsonReplace = nlohmann::ordered_json::error_handler_t::replace;
 constexpr auto kFrameBudget = std::chrono::milliseconds{12};
-constexpr int kDeepestNode = 32;
 constexpr std::uint64_t kBudgetStride = 32;
-
-nlohmann::ordered_json json_node(const Node &node, const int depth)
-{
-    nlohmann::ordered_json object{{"label", node.label}};
-    if (depth < kDeepestNode && !node.children.empty()) {
-        auto &children = object["children"] = nlohmann::ordered_json::array();
-        for (const auto &child : node.children) {
-            children.push_back(json_node(child, depth + 1));
-        }
-    }
-    return object;
-}
 
 void finish(ExportJob &job, std::string message)
 {
@@ -310,8 +297,9 @@ void advance_export(ExportJob &job, const Capture &capture)
                 }
                 if (job.options.details) {
                     chunk += report_details(details, job.options.bytes);
-                    if (blob.fields) {
-                        chunk += report_node(*blob.fields, 1);
+                    if (!blob.fields.is_null()) {
+                        chunk += "  Fields\n";
+                        chunk += report_node(blob.fields, 2);
                     }
                 }
                 else if (job.options.bytes) {
@@ -334,17 +322,14 @@ void advance_export(ExportJob &job, const Capture &capture)
                     {"decoded", record.decoded},
                     {"unread", record.unread},
                 };
-                if (details.error) {
-                    packet["error"] = json_node(*details.error, 0);
+                if (!details.error.is_null()) {
+                    packet["error"] = details.error;
                 }
-                if (job.options.details && blob.fields) {
-                    auto &tree = packet["fields"] = nlohmann::ordered_json::array();
-                    for (const auto &field : blob.fields->children) {
-                        tree.push_back(json_node(field, 0));
-                    }
+                if (job.options.details && !blob.fields.is_null()) {
+                    packet["fields"] = blob.fields;
                 }
                 if (job.options.bytes) {
-                    packet["bytes"] = format_bytes(body, 0, BytesFormat::Base64);
+                    packet["bytes"] = std::format("atob({})", format_bytes(body, 0, BytesFormat::Base64));
                 }
                 chunk += job.written == 0 ? "\n    " : ",\n    ";
                 chunk += packet.dump(-1, ' ', false, kJsonReplace);

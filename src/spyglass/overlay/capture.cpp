@@ -74,8 +74,9 @@ void Capture::record(Incoming incoming, const Direction direction)
         .id = static_cast<std::int16_t>(incoming.id),
         .sub_id = incoming.sub_id,
         .flags = static_cast<std::uint8_t>((direction == Direction::Outbound ? kOutbound : 0U) |
-                                           (incoming.decoded ? kDecoded : 0U) | (incoming.error ? kHasError : 0U) |
-                                           (incoming.fields ? kHasFields : 0U)),
+                                           (incoming.decoded ? kDecoded : 0U) |
+                                           (incoming.error.is_null() ? 0U : kHasError) |
+                                           (incoming.fields.is_null() ? 0U : kHasFields)),
     };
     if (!store_.push(entry, std::move(blob))) {
         return;
@@ -119,13 +120,18 @@ void Capture::record(Incoming incoming, const Direction direction)
     ++rates_[second].packets;
     rates_[second].bytes += length;
 
-    if (incoming.error) {
+    if (!incoming.error.is_null()) {
+        std::string reason;
+        if (const auto found = incoming.error.find("reason");
+            found != incoming.error.end() && found->is_string()) {
+            reason = found->get_ref<const std::string &>();
+        }
         const auto at = std::ranges::find_if(failures_, [&](const Failure &failure) {
-            return failure.id == incoming.id && failure.reason == incoming.error->label;
+            return failure.id == incoming.id && failure.reason == reason;
         });
         if (at == failures_.end()) {
             failures_.push_back({
-                .reason = incoming.error->label,
+                .reason = reason,
                 .name = interned_name(incoming.id),
                 .id = incoming.id,
                 .count = 1,
@@ -180,7 +186,7 @@ std::optional<Details> Capture::selected_details() const
     return found;
 }
 
-std::optional<Node> Capture::fields(const std::uint64_t number)
+Fields Capture::fields(const std::uint64_t number)
 {
     {
         const std::lock_guard lock{fields_mutex_};
@@ -192,25 +198,29 @@ std::optional<Node> Capture::fields(const std::uint64_t number)
 
     Entry entry;
     if (!store_.at(number, entry)) {
-        return std::nullopt;
+        return {};
     }
 
     auto decoded = store_.fields(number, entry);
-    if (!decoded) {
+    if (decoded.is_null()) {
         const auto blob = store_.read(entry);
         if (!blob.body) {
-            return std::nullopt;
+            return {};
         }
-        decoded = decode_body(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()})
-                      .value_or(Node{.label = "Fields"});
-        store_.store_fields(number, *decoded);
+        decoded = decode_body(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()});
+        if (decoded.is_null()) {
+            decoded = nlohmann::ordered_json::object();
+        }
+        store_.store_fields(number, decoded);
     }
+
+    auto held = std::make_shared<const nlohmann::ordered_json>(std::move(decoded));
 
     const std::lock_guard lock{fields_mutex_};
     if (const auto at = field_at_.find(number); at != field_at_.end()) {
         return at->second->second;
     }
-    fields_.emplace_front(number, std::move(*decoded));
+    fields_.emplace_front(number, std::move(held));
     field_at_[number] = fields_.begin();
     while (fields_.size() > kFieldCache) {
         field_at_.erase(fields_.back().first);

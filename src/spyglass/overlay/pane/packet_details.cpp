@@ -2,16 +2,22 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <format>
 #include <optional>
+#include <string>
+#include <string_view>
 
 #include <imgui.h>
 
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/options.h"
+#include "spyglass/overlay/report.h"
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
 namespace {
+
+constexpr int kDeepestNode = 64;
 
 constexpr auto kBranch = ImGuiTreeNodeFlags_SpanAvailWidth;
 constexpr auto kLeaf =
@@ -24,20 +30,67 @@ void set_open(const ViewOptions &options)
     }
 }
 
-void draw_node(const ViewOptions &options, const Node &node, const int index)
+void draw_node(const ViewOptions &options, std::string &text, const std::string_view key,
+               const nlohmann::ordered_json &value, const int index, const int depth)
 {
+    if (depth > kDeepestNode) {
+        return;
+    }
+
+    text.clear();
+    field_line(text, key, value);
+
     ImGui::PushID(index);
-    if (node.children.empty()) {
-        ImGui::TreeNodeEx("node", kLeaf, "%s", node.label.c_str());
+    if (!value.is_structured() || value.empty()) {
+        ImGui::TreeNodeEx("node", kLeaf, "%s", text.c_str());
     }
     else {
         set_open(options);
-        if (ImGui::TreeNodeEx("node", kBranch, "%s", node.label.c_str())) {
-            int child = 0;
-            for (const auto &branch : node.children) {
-                draw_node(options, branch, child++);
+        if (ImGui::TreeNodeEx("node", kBranch, "%s", text.c_str())) {
+            auto child = 0;
+            if (value.is_object()) {
+                for (const auto &[name, held] : value.items()) {
+                    draw_node(options, text, name, held, child++, depth + 1);
+                }
+            }
+            else {
+                char label[24];
+                for (const auto &held : value) {
+                    const auto end = std::format_to_n(label, sizeof(label) - 1, "[{}]", child);
+                    *end.out = '\0';
+                    draw_node(options, text, label, held, child++, depth + 1);
+                }
             }
             ImGui::TreePop();
+        }
+    }
+    ImGui::PopID();
+}
+
+void draw_failure(const ViewOptions &options, const nlohmann::ordered_json &error, const int index, const int depth)
+{
+    if (!error.is_object() || depth > kDeepestNode) {
+        return;
+    }
+
+    ImGui::PushID(index);
+    if (const auto reason = error.find("reason"); reason != error.end() && reason->is_string()) {
+        ImGui::TreeNodeEx("reason", kLeaf, "%s", reason->get_ref<const std::string &>().c_str());
+    }
+    if (const auto frames = error.find("frames"); frames != error.end() && frames->is_array()) {
+        auto at = 0;
+        for (const auto &frame : *frames) {
+            if (frame.is_string()) {
+                ImGui::PushID(at++);
+                ImGui::TreeNodeEx("frame", kLeaf, "%s", frame.get_ref<const std::string &>().c_str());
+                ImGui::PopID();
+            }
+        }
+    }
+    if (const auto causes = error.find("causes"); causes != error.end() && causes->is_array()) {
+        auto at = 0;
+        for (const auto &cause : *causes) {
+            draw_failure(options, cause, at++, depth + 1);
         }
     }
     ImGui::PopID();
@@ -71,12 +124,12 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
             }
-            const auto lazy = capture.fields(record->number);
-            const Node *const fields = lazy ? &*lazy : nullptr;
-            if (fields != nullptr && !fields->children.empty()) {
-                int child = 0;
-                for (const auto &field : fields->children) {
-                    draw_node(options, field, child++);
+            const auto fields = capture.fields(record->number);
+            if (fields && fields->is_object() && !fields->empty()) {
+                std::string text;
+                auto child = 0;
+                for (const auto &[name, held] : fields->items()) {
+                    draw_node(options, text, name, held, child++, 0);
                 }
             }
             else {
@@ -85,13 +138,13 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             ImGui::TreePop();
         }
 
-        if (details->error) {
+        if (!details->error.is_null()) {
             const auto stopped = length - std::min<std::size_t>(record->unread, length);
             ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
             ImGui::SetNextItemOpen(true, ImGuiCond_Once);
             set_open(options);
             if (ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped)) {
-                draw_node(options, *details->error, 0);
+                draw_failure(options, details->error, 0, 0);
                 ImGui::TreePop();
             }
             ImGui::PopStyleColor();

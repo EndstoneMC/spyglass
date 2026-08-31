@@ -26,4 +26,6 @@ std::string format_bytes(std::span<const std::uint8_t> bytes, std::size_t offset
 
 bool parse_needle(std::string_view query, bool hex, std::vector<std::uint8_t> &needle);
 
+bool parse_base64(std::string_view text, std::vector<std::uint8_t> &bytes);
+
 }  // namespace spyglass

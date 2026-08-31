@@ -32,8 +32,7 @@ constexpr std::string_view kExtension = ".cap";
 constexpr std::string_view kIndexExtension = ".index";
 constexpr std::string_view kFieldsExtension = ".fields";
 constexpr std::string_view kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-constexpr std::uint32_t kVersion = 1;
-constexpr int kMaxDepth = 64;
+constexpr std::uint32_t kVersion = 2;
 constexpr int kRandomChars = 6;
 constexpr std::intptr_t kNoLock = -1;
 constexpr unsigned long kLockRegion = 0x40000000;
@@ -93,19 +92,6 @@ void put(std::vector<std::uint8_t> &out, const std::string_view value)
     out.insert(out.end(), value.begin(), value.end());
 }
 
-void put(std::vector<std::uint8_t> &out, const Node &node, const int depth)
-{
-    put(out, std::string_view{node.label});
-    if (depth >= kMaxDepth) {
-        put(out, std::uint32_t{0});
-        return;
-    }
-    put(out, static_cast<std::uint32_t>(node.children.size()));
-    for (const auto &child : node.children) {
-        put(out, child, depth + 1);
-    }
-}
-
 bool take(std::string_view &in, std::uint32_t &value)
 {
     if (in.size() < sizeof(value)) {
@@ -116,33 +102,22 @@ bool take(std::string_view &in, std::uint32_t &value)
     return true;
 }
 
-bool take(std::string_view &in, std::string &value)
+nlohmann::ordered_json take_document(std::string_view &in)
 {
     std::uint32_t length = 0;
-    if (!take(in, length) || in.size() < length) {
-        return false;
+    if (!take(in, length) || length > in.size()) {
+        return {};
     }
-    value.assign(in.data(), length);
-    in.remove_prefix(length);
-    return true;
-}
 
-bool take(std::string_view &in, Node &node, const int depth)
-{
-    std::uint32_t children = 0;
-    if (!take(in, node.label) || !take(in, children) || children > in.size() / sizeof(children)) {
-        return false;
+    nlohmann::ordered_json document;
+    try {
+        document = nlohmann::ordered_json::from_msgpack(in.begin(), in.begin() + length, true, false);
     }
-    if (depth >= kMaxDepth) {
-        return children == 0;
+    catch (...) {
+        document = {};
     }
-    node.children.resize(children);
-    for (auto &child : node.children) {
-        if (!take(in, child, depth + 1)) {
-            return false;
-        }
-    }
-    return true;
+    in.remove_prefix(length);
+    return document.is_discarded() ? nlohmann::ordered_json{} : document;
 }
 
 std::vector<std::atomic<const std::string *>> &fallback_names()
@@ -188,15 +163,19 @@ void intern_name(const int id, const std::string_view name)
     }
 }
 
-void pack(std::vector<std::uint8_t> &blob, const std::string_view body, const std::optional<Node> &error,
-          const std::optional<Node> &fields)
+void pack(std::vector<std::uint8_t> &blob, const std::string_view body, const nlohmann::ordered_json &error,
+          const nlohmann::ordered_json &fields)
 {
     blob.assign(body.begin(), body.end());
-    if (error) {
-        put(blob, *error, 0);
-    }
-    if (fields) {
-        put(blob, *fields, 0);
+    for (const auto *document : {&error, &fields}) {
+        if (document->is_null()) {
+            continue;
+        }
+        const auto at = blob.size();
+        put(blob, std::uint32_t{0});
+        nlohmann::ordered_json::to_msgpack(*document, blob);
+        const auto length = static_cast<std::uint32_t>(blob.size() - at - sizeof(std::uint32_t));
+        std::memcpy(blob.data() + at, &length, sizeof(length));
     }
 }
 
@@ -498,22 +477,18 @@ Blob Store::read(const Entry &entry, const bool with_fields) const
     std::string_view rest{reinterpret_cast<const char *>(raw.data()) + entry.body_length,
                           entry.blob_length - entry.body_length};
     if ((entry.flags & kHasError) != 0) {
-        Node error;
-        if (!take(rest, error, 0)) {
+        blob.error = take_document(rest);
+        if (blob.error.is_null()) {
             return blob;
         }
-        blob.error = std::move(error);
     }
     if (with_fields && (entry.flags & kHasFields) != 0) {
-        Node fields;
-        if (take(rest, fields, 0)) {
-            blob.fields = std::move(fields);
-        }
+        blob.fields = take_document(rest);
     }
     return blob;
 }
 
-std::optional<Node> Store::fields(const std::uint64_t number, const Entry &entry) const
+nlohmann::ordered_json Store::fields(const std::uint64_t number, const Entry &entry) const
 {
     if ((entry.flags & kHasFields) != 0) {
         return read(entry, true).fields;
@@ -522,7 +497,7 @@ std::optional<Node> Store::fields(const std::uint64_t number, const Entry &entry
     const std::lock_guard lock{fields_mutex_};
     const auto at = field_at_.find(number);
     if (at == field_at_.end() || !fields_reader_.is_open()) {
-        return std::nullopt;
+        return {};
     }
 
     std::vector<std::uint8_t> raw(at->second.second);
@@ -530,21 +505,20 @@ std::optional<Node> Store::fields(const std::uint64_t number, const Entry &entry
     fields_reader_.seekg(static_cast<std::streamoff>(at->second.first));
     fields_reader_.read(reinterpret_cast<char *>(raw.data()), static_cast<std::streamsize>(raw.size()));
     if (fields_reader_.gcount() != static_cast<std::streamsize>(raw.size())) {
-        return std::nullopt;
+        return {};
     }
 
     std::string_view rest{reinterpret_cast<const char *>(raw.data()), raw.size()};
-    Node fields;
-    if (!take(rest, fields, 0)) {
-        return std::nullopt;
-    }
-    return fields;
+    return take_document(rest);
 }
 
-void Store::store_fields(const std::uint64_t number, const Node &fields)
+void Store::store_fields(const std::uint64_t number, const nlohmann::ordered_json &fields)
 {
     std::vector<std::uint8_t> raw;
-    put(raw, fields, 0);
+    put(raw, std::uint32_t{0});
+    nlohmann::ordered_json::to_msgpack(fields, raw);
+    const auto length = static_cast<std::uint32_t>(raw.size() - sizeof(std::uint32_t));
+    std::memcpy(raw.data(), &length, sizeof(length));
 
     const std::lock_guard lock{fields_mutex_};
     if (!fields_writer_.is_open() || field_at_.contains(number)) {

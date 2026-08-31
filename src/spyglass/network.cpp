@@ -14,6 +14,8 @@
 #include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/network/batched_network_peer.h"
 #include "bedrock/network/minecraft_packets.h"
+#include <nlohmann/json.hpp>
+
 #include "bedrock/network/packet.h"
 #include "spyglass/detail.h"
 #include "spyglass/filename.h"
@@ -35,35 +37,45 @@ constexpr bool kBreakFirstSubChunk = false;
 constexpr int kSubChunkPacket = 174;
 std::atomic_bool g_broke_one{false};
 
-spyglass::Node node_of(const Bedrock::ErrorInfo<std::error_code> &info)
+constexpr int kMaxErrorDepth = 16;
+
+nlohmann::ordered_json error_json(const Bedrock::ErrorInfo<std::error_code> &info, const int depth)
 {
-    spyglass::Node node{.label = std::format("{} ({} {})", info.error.message(), info.error.category().name(),
-                                             info.error.value())};
-    for (const auto &entry : info.call_stack.frames) {
-        auto filename = entry.frame.filename;
-        if (filename.empty() || filename == "-") {
-            filename = spyglass::filename_of(entry.frame.filename_hash);
+    nlohmann::ordered_json error{
+        {"reason", std::format("{} ({} {})", info.error.message(), info.error.category().name(), info.error.value())},
+    };
+
+    if (!info.call_stack.frames.empty()) {
+        auto &frames = error["frames"] = nlohmann::ordered_json::array();
+        for (const auto &entry : info.call_stack.frames) {
+            auto filename = entry.frame.filename;
+            if (filename.empty() || filename == "-") {
+                filename = spyglass::filename_of(entry.frame.filename_hash);
+            }
+            auto label = filename.empty() ? std::format("<{:016x}>:{}", entry.frame.filename_hash, entry.frame.line)
+                                          : std::format("{}:{}", filename, entry.frame.line);
+            if (entry.context.has_value()) {
+                label += std::format(" - {}", entry.context->value);
+            }
+            frames.push_back(std::move(label));
         }
-        auto label = filename.empty()
-                         ? std::format("<{:016x}>:{}", entry.frame.filename_hash, entry.frame.line)
-                         : std::format("{}:{}", filename, entry.frame.line);
-        if (entry.context.has_value()) {
-            label += std::format(" - {}", entry.context->value);
+    }
+
+    if (depth < kMaxErrorDepth && !info.branches.empty()) {
+        auto &causes = error["causes"] = nlohmann::ordered_json::array();
+        for (const auto &branch : info.branches) {
+            causes.push_back(error_json(branch, depth + 1));
         }
-        node.children.push_back({.label = std::move(label)});
     }
-    for (const auto &branch : info.branches) {
-        node.children.push_back(node_of(branch));
-    }
-    return node;
+    return error;
 }
 
-std::optional<spyglass::Node> error_of(const Bedrock::Result<void> &result)
+nlohmann::ordered_json error_of(const Bedrock::Result<void> &result)
 {
     if (result.asExpected().has_value()) {
-        return std::nullopt;
+        return {};
     }
-    return node_of(result.asExpected().error());
+    return error_json(result.asExpected().error(), 0);
 }
 
 }  // namespace

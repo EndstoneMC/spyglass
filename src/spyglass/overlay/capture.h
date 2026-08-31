@@ -31,7 +31,7 @@ struct Record {
 struct Details {
     Record record;
     Body body;
-    std::optional<Node> error;
+    nlohmann::ordered_json error;
 };
 
 struct Incoming {
@@ -40,8 +40,8 @@ struct Incoming {
     bool decoded{true};
     std::uint32_t unread{0};
     std::uint8_t sub_id{0};
-    std::optional<Node> error;
-    std::optional<Node> fields;
+    nlohmann::ordered_json error;
+    nlohmann::ordered_json fields;
     std::string_view body;
 };
 
@@ -128,7 +128,7 @@ public:
     [[nodiscard]] Record at_number(std::uint64_t number) const;
     [[nodiscard]] Details details(std::uint64_t number) const;
     [[nodiscard]] std::optional<Details> selected_details() const;
-    [[nodiscard]] std::optional<Node> fields(std::uint64_t number);
+    [[nodiscard]] Fields fields(std::uint64_t number);
     [[nodiscard]] std::uint64_t bad() const;
     [[nodiscard]] std::vector<std::uint64_t> counts() const;
     [[nodiscard]] std::vector<Failure> failures() const;
@@ -172,8 +172,8 @@ private:
     bool running_{true};
 
     mutable std::mutex fields_mutex_;
-    mutable std::list<std::pair<std::uint64_t, Node>> fields_;
-    mutable std::unordered_map<std::uint64_t, std::list<std::pair<std::uint64_t, Node>>::iterator> field_at_;
+    mutable std::list<std::pair<std::uint64_t, Fields>> fields_;
+    mutable std::unordered_map<std::uint64_t, std::list<std::pair<std::uint64_t, Fields>>::iterator> field_at_;
 };
 
 }  // namespace spyglass

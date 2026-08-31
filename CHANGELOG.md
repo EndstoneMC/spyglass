@@ -49,6 +49,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopping the game. `Export Selected Packet Bytes...` writes the range selected in the bytes pane as
   a raw file, and the whole body when nothing is selected. `Export Session Summary...` writes the
   totals.
+- Field values in the JSON export are the values themselves rather than the text the details pane
+  shows: a number is a number, a flag is a flag, and a field holding bytes carries all of them
+  instead of the first sixteen. The pane and the text export still show the same short preview they
+  always did, so only the JSON gained. Bytes read as `atob(...)` so it is obvious what they are and
+  how to decode them.
+- The writer queue holds 16 MB rather than 4 MB by default, which is what keeps a run of large
+  packets from being dropped now that a packet's fields are kept whole.
 - Exports go through a save dialog drawn in the overlay, since the overlay runs inside the client's
   own present call and the Android build has no system dialog to open. It starts in
   `%LOCALAPPDATA%\spyglass` (`~/.local/share/spyglass` on the Linux launcher), lists what is there,

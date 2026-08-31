@@ -5,8 +5,7 @@
 
 namespace spyglass {
 
-std::string format_bytes(const std::span<const std::uint8_t> bytes, const std::size_t offset,
-                         const BytesFormat format)
+std::string format_bytes(const std::span<const std::uint8_t> bytes, const std::size_t offset, const BytesFormat format)
 {
     std::string text;
 
@@ -99,6 +98,44 @@ bool parse_needle(const std::string_view query, const bool hex, std::vector<std:
         }
     }
     return high < 0;
+}
+
+bool parse_base64(const std::string_view text, std::vector<std::uint8_t> &bytes)
+{
+    bytes.clear();
+    if (text.empty() || text.size() % 4 != 0) {
+        return false;
+    }
+
+    bytes.reserve((text.size() / 4) * 3);
+    for (std::size_t at = 0; at < text.size(); at += 4) {
+        std::uint32_t quad = 0;
+        std::size_t padding = 0;
+        for (std::size_t i = 0; i < 4; ++i) {
+            const auto character = text[at + i];
+            if (character == '=') {
+                if (at + 4 != text.size() || i < 2) {
+                    return false;
+                }
+                ++padding;
+                quad <<= 6;
+                continue;
+            }
+            const auto digit = kBase64Alphabet.find(character);
+            if (padding != 0 || digit == std::string_view::npos) {
+                return false;
+            }
+            quad = (quad << 6) | static_cast<std::uint32_t>(digit);
+        }
+        bytes.push_back(static_cast<std::uint8_t>((quad >> 16) & 0xFF));
+        if (padding < 2) {
+            bytes.push_back(static_cast<std::uint8_t>((quad >> 8) & 0xFF));
+        }
+        if (padding < 1) {
+            bytes.push_back(static_cast<std::uint8_t>(quad & 0xFF));
+        }
+    }
+    return true;
 }
 
 }  // namespace spyglass

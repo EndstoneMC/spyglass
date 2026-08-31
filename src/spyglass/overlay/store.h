@@ -9,13 +9,14 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 namespace spyglass {
 
@@ -25,11 +26,7 @@ enum class Direction : int {
 };
 
 using Body = std::shared_ptr<const std::vector<std::uint8_t>>;
-
-struct Node {
-    std::string label;
-    std::vector<Node> children;
-};
+using Fields = std::shared_ptr<const nlohmann::ordered_json>;
 
 constexpr std::uint8_t kOutbound = 1U << 0U;
 constexpr std::uint8_t kDecoded = 1U << 1U;
@@ -53,12 +50,12 @@ static_assert(sizeof(Entry) == 32);
 
 struct Blob {
     Body body;
-    std::optional<Node> error;
-    std::optional<Node> fields;
+    nlohmann::ordered_json error;
+    nlohmann::ordered_json fields;
 };
 
 struct StoreOptions {
-    std::size_t queue_bytes{4 * 1024 * 1024};
+    std::size_t queue_bytes{16 * 1024 * 1024};
     std::size_t queue_records{4096};
     std::size_t resident_blocks{2048};
 
@@ -68,8 +65,8 @@ struct StoreOptions {
 std::string_view interned_name(int id);
 void intern_name(int id, std::string_view name);
 
-void pack(std::vector<std::uint8_t> &blob, std::string_view body, const std::optional<Node> &error,
-          const std::optional<Node> &fields);
+void pack(std::vector<std::uint8_t> &blob, std::string_view body, const nlohmann::ordered_json &error,
+          const nlohmann::ordered_json &fields);
 
 void sweep_captures();
 
@@ -92,8 +89,8 @@ public:
     [[nodiscard]] bool at(std::uint64_t number, Entry &entry) const;
     [[nodiscard]] Blob read(const Entry &entry, bool with_fields = false) const;
 
-    [[nodiscard]] std::optional<Node> fields(std::uint64_t number, const Entry &entry) const;
-    void store_fields(std::uint64_t number, const Node &fields);
+    [[nodiscard]] nlohmann::ordered_json fields(std::uint64_t number, const Entry &entry) const;
+    void store_fields(std::uint64_t number, const nlohmann::ordered_json &fields);
 
     void restart();
 
