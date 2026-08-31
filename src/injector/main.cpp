@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cwchar>
@@ -167,17 +168,15 @@ struct Client {
     std::array<unsigned, 4> version;
 };
 
-std::optional<Client> identify(const HANDLE process)
+std::optional<Client> identify_by_package(const HANDLE process)
 {
     UINT32 length = 0;
     if (GetPackageFullName(process, &length, nullptr) != ERROR_INSUFFICIENT_BUFFER) {
-        std::fwprintf(stderr, L"error: the client runs without a package identity to read its version from\n");
         return std::nullopt;
     }
 
     std::wstring package(length, L'\0');
-    if (const auto status = GetPackageFullName(process, &length, package.data()); status != ERROR_SUCCESS) {
-        report(L"GetPackageFullName", status);
+    if (GetPackageFullName(process, &length, package.data()) != ERROR_SUCCESS) {
         return std::nullopt;
     }
     package.resize(length - 1);
@@ -185,7 +184,6 @@ std::optional<Client> identify(const HANDLE process)
     const auto name_end = package.find(L'_');
     const auto version_end = package.find(L'_', name_end + 1);
     if (version_end == std::wstring::npos) {
-        std::fwprintf(stderr, L"error: %s is not a package full name\n", package.c_str());
         return std::nullopt;
     }
 
@@ -202,6 +200,81 @@ std::optional<Client> identify(const HANDLE process)
         .preview = package.starts_with(kPreviewPackage),
         .version = {numbers[0], numbers[1], patch_and_build / 100, patch_and_build % 100},
     };
+}
+
+std::optional<bool> image_names_preview(const std::wstring &image)
+{
+    const UniqueHandle file{CreateFileW(image.c_str(), GENERIC_READ,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                                        FILE_ATTRIBUTE_NORMAL, nullptr)};
+    LARGE_INTEGER size{};
+    if (file.get() == INVALID_HANDLE_VALUE || GetFileSizeEx(file.get(), &size) == 0) {
+        return std::nullopt;
+    }
+
+    const UniqueHandle mapping{CreateFileMappingW(file.get(), nullptr, PAGE_READONLY, 0, 0, nullptr)};
+    if (!mapping) {
+        return std::nullopt;
+    }
+    const auto *const view = static_cast<const std::byte *>(MapViewOfFile(mapping.get(), FILE_MAP_READ, 0, 0, 0));
+    if (view == nullptr) {
+        return std::nullopt;
+    }
+
+    constexpr std::wstring_view name = L"Minecraft Preview";
+    const auto *const bytes = reinterpret_cast<const std::byte *>(name.data());
+    const auto *const end = view + size.QuadPart;
+    const auto found = std::search(view, end, bytes, bytes + name.size() * sizeof(wchar_t)) != end;
+    UnmapViewOfFile(view);
+    return found;
+}
+
+std::optional<Client> identify_by_image(const HANDLE process)
+{
+    std::wstring image(32768, L'\0');
+    auto length = static_cast<DWORD>(image.size());
+    if (QueryFullProcessImageNameW(process, 0, image.data(), &length) == 0) {
+        return std::nullopt;
+    }
+    image.resize(length);
+
+    DWORD unused = 0;
+    const auto bytes = GetFileVersionInfoSizeW(image.c_str(), &unused);
+    if (bytes == 0) {
+        return std::nullopt;
+    }
+
+    std::vector<std::byte> block(bytes);
+    VS_FIXEDFILEINFO *info = nullptr;
+    UINT size = 0;
+    if (GetFileVersionInfoW(image.c_str(), 0, bytes, block.data()) == 0 ||
+        VerQueryValueW(block.data(), L"\\", reinterpret_cast<void **>(&info), &size) == 0 ||
+        size < sizeof(VS_FIXEDFILEINFO)) {
+        return std::nullopt;
+    }
+
+    const auto preview = image_names_preview(image);
+    if (!preview) {
+        return std::nullopt;
+    }
+
+    return Client{
+        .preview = *preview,
+        .version = {HIWORD(info->dwFileVersionMS), LOWORD(info->dwFileVersionMS), HIWORD(info->dwFileVersionLS),
+                    LOWORD(info->dwFileVersionLS)},
+    };
+}
+
+std::optional<Client> identify(const HANDLE process)
+{
+    if (const auto client = identify_by_package(process)) {
+        return client;
+    }
+    if (const auto client = identify_by_image(process)) {
+        return client;
+    }
+    std::fwprintf(stderr, L"error: the client has neither a package identity nor a readable version resource\n");
+    return std::nullopt;
 }
 
 struct Target {

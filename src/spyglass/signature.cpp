@@ -34,7 +34,7 @@ bool client_is_preview()
     return std::search(rdata.begin(), rdata.end(), bytes, bytes + name.size() * sizeof(wchar_t)) != rdata.end();
 }
 
-std::optional<std::array<unsigned, 4>> client_version()
+std::optional<std::array<unsigned, 4>> version_from_package()
 {
     UINT32 length = 0;
     if (GetCurrentPackageFullName(&length, nullptr) != ERROR_INSUFFICIENT_BUFFER) {
@@ -63,6 +63,32 @@ std::optional<std::array<unsigned, 4>> client_version()
     const auto patch_and_build = numbers[2];
 
     return std::array<unsigned, 4>{numbers[0], numbers[1], patch_and_build / 100, patch_and_build % 100};
+}
+
+std::optional<std::array<unsigned, 4>> version_from_resource()
+{
+    auto *const self = GetModuleHandleW(nullptr);
+    auto *const found = FindResourceW(self, MAKEINTRESOURCEW(VS_VERSION_INFO), RT_VERSION);
+    auto *const loaded = found != nullptr ? LoadResource(self, found) : nullptr;
+    auto *const block = loaded != nullptr ? LockResource(loaded) : nullptr;
+
+    VS_FIXEDFILEINFO *info = nullptr;
+    UINT size = 0;
+    if (block == nullptr || VerQueryValueW(block, L"\\", reinterpret_cast<void **>(&info), &size) == 0 ||
+        size < sizeof(VS_FIXEDFILEINFO)) {
+        return std::nullopt;
+    }
+
+    return std::array<unsigned, 4>{HIWORD(info->dwFileVersionMS), LOWORD(info->dwFileVersionMS),
+                                   HIWORD(info->dwFileVersionLS), LOWORD(info->dwFileVersionLS)};
+}
+
+std::optional<std::array<unsigned, 4>> client_version()
+{
+    if (const auto version = version_from_package()) {
+        return version;
+    }
+    return version_from_resource();
 }
 
 }  // namespace
