@@ -69,33 +69,24 @@ float, a varint and text. `Statistics` reports what the session captured, a brea
 of the bytes, the distribution of packet lengths, and a graph of packets or bytes per second.
 
 Sent packets are captured as well as received ones, so a request and the answer to it sit in the same list. The
-capture has no length limit. Packet bodies are written to a file as they arrive and read back when a packet is
-shown, so the first packet of a session is still there hours later and memory tracks the size of the index rather
-than the length of the capture. A list row costs 32 bytes, which is what a column is drawn from, and the index
-itself pages to disk once it passes its budget. `Capture ▸ Options` sets that budget, sets the size of the queue
-between the client's thread and the writer, and turns off capturing sent packets when only the server's half of the
-conversation is in question.
+capture has no length limit: the first packet of a session is still there hours later. `Capture ▸ Options` sets what
+it may use, and turns off capturing sent packets when only the server's half of the conversation is in question.
+Packets are dropped rather than allowed to hold the game up, and the status bar counts them when it happens, next to
+the size of the capture.
 
-A packet arriving while that queue is full is dropped rather than made to wait, because the alternative is stalling
-the thread the client decodes packets on. The status bar counts the drops when there are any, next to the size of
-the capture on disk.
-
-The capture file is a scratch file, named like `spyglass_A1b2C3.cap` in the system temporary directory, and it goes
-when the client does. A file left behind by a client that crashed is removed the next time spyglass is injected: the
-running one holds a lock on its own file, so the sweep can tell a live capture from an abandoned one.
+The capture is temporary and goes when the client does. One left behind by a client that crashed is cleaned up the
+next time spyglass is injected.
 
 `File` writes the capture out. `Export Packets...` takes the packets as text, CSV or JSON, and asks which ones: all of
 them, the selected one, the marked ones, or a range you write out, against either everything captured or only what the
 filter is showing. It also asks how much of each packet to write, the summary line, the details tree, the bytes, or any
-combination. It counts what each choice selects and estimates the size before you commit to it, and a long export runs
-a few milliseconds at a time with a progress bar and a Cancel button rather than stopping the game.
+combination. It counts what each choice selects and estimates the size before you commit to it, and a long export
+shows its progress and can be cancelled, without stopping the game.
 `Export Selected Packet Bytes...` writes the range selected in the bytes pane as a raw file with nothing added, and the
 whole body when nothing is selected. `Export Session Summary...` writes the totals.
 
-The save dialog is drawn in the overlay rather than by the system, because the overlay runs on the render thread inside
-the client's own present call and the Android build has no system dialog to open. It starts in
-`%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher, lists the directory it is in, takes a
-path typed in full, and says so before it overwrites a file.
+The save dialog starts in `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher, lists the
+directory it is in, takes a path typed in full, and says so before it overwrites a file.
 
 ## Quick Start
 
@@ -195,9 +186,7 @@ is what CI ships, and any four-component version works, with `-preview` on the o
 cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40.5;1.26.50.27-preview"
 ```
 
-The version reaches the code as `MINECRAFT_VERSION_HEX`, which is what selects the EnTT revision the client was
-compiled against, the shape of the reflection structs it exposes, and the patterns to scan for. A version no
-pattern set covers fails the build rather than producing a payload that would scan the wrong bytes.
+A version no pattern set covers fails the build rather than producing a payload that would not work.
 
 ## Client Versions
 
@@ -207,16 +196,13 @@ pattern set covers fails the build rather than producing a payload that would sc
 | `spyglass-0.2.0-1.26.50.preview.dll` | Windows preview 1.26.50.27 |
 | `libspyglass-0.2.0-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
-Release and preview are separate builds of the game, and 1.26.50 changed the reflection structs the field decoder
-reads, so a payload is built for one client line and carries only that line's patterns and struct layouts. On
-Windows the injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was
-not built for says so in the errors window and installs no hooks, rather than reading the wrong layout.
+Release and preview are separate builds of the game, so a payload is built for one client line. On Windows the
+injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was not built for
+says so in the errors window and installs nothing.
 
-Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied to a single build, and in
-practice a set carries across the builds of a line. It will not guess, though. If a pattern no longer matches
-exactly one place it refuses to install that hook and says so in the errors window rather than risk patching the
-wrong function, so a client update can need the patterns refreshed. If the packet count stays at zero while you are
-connected, that window is where the reason is.
+A payload is not tied to a single build, and in practice covers the builds of a line, but a client update can still
+need it refreshed. It will not guess: it says so in the errors window rather than act on something it is unsure of.
+If the packet count stays at zero while you are connected, that window is where the reason is.
 
 ## Caveats
 
