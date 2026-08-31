@@ -203,7 +203,7 @@ Fields Capture::fields(const std::uint64_t number)
 
     auto decoded = store_.fields(number, entry);
     if (decoded.is_null()) {
-        if (needs_live_registry(interned_name(entry.id), entry.id)) {
+        if (decode_mode(interned_name(entry.id), entry.id) == DecodeMode::Eager) {
             return {};
         }
         const auto blob = store_.read(entry);

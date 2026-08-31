@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -614,6 +615,14 @@ bool holds_item(const entt::meta_type &type, std::unordered_set<entt::id_type> &
         if (holds_item(data.type(), seen, depth + 1)) {
             return true;
         }
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
+        const cereal::internal::BasicSchema::MemberDescriptor *descriptor = data.custom();
+        const auto *context = reflection_ctx();
+        if (descriptor != nullptr && descriptor->mDynamicSetterArgCtor != nullptr && context != nullptr &&
+            holds_item(descriptor->mDynamicSetterArgCtor(context->internal().mMetaCtx), seen, depth + 1)) {
+            return true;
+        }
+#endif
     }
     for (auto &&[func_id, func] : type.func()) {
         if (holds_item(func.ret(), seen, depth + 1)) {
@@ -650,7 +659,7 @@ const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ct
 
 }  // namespace
 
-bool needs_live_registry(const std::string_view name, const int id)
+DecodeMode decode_mode(const std::string_view name, const int id)
 {
     constexpr std::array<std::string_view, 18> kItemPackets{
         "AddActorPacket",          "AddItemActorPacket",      "AddPlayerPacket",
@@ -661,24 +670,29 @@ bool needs_live_registry(const std::string_view name, const int id)
         "PlayerAuthInputPacket",   "StartGamePacket",         "UpdateTradePacket",
     };
     if (std::ranges::find(kItemPackets, name) != kItemPackets.end()) {
-        return true;
+        return DecodeMode::Eager;
     }
 
-    static const auto marked = [] {
-        std::unordered_set<int> found;
-        const auto *ctx = reflection_ctx();
-        if (ctx == nullptr) {
-            return found;
+    static std::array<std::atomic<DecodeMode>, 1024> known{};
+    if (id < 0 || id >= static_cast<int>(known.size())) {
+        return DecodeMode::Lazy;
+    }
+
+    auto &slot = known[static_cast<std::size_t>(id)];
+    if (const auto seen = slot.load(std::memory_order_relaxed); seen != DecodeMode::Unknown) {
+        return seen;
+    }
+
+    auto mode = DecodeMode::Lazy;
+    if (const auto *ctx = reflection_ctx(); ctx != nullptr) {
+        const auto &types = packet_types(ctx->internal().mMetaCtx);
+        if (const auto entry = types.find(id); entry != types.end()) {
+            std::unordered_set<entt::id_type> walked;
+            mode = holds_item(entry->second, walked, 0) ? DecodeMode::Eager : DecodeMode::Lazy;
         }
-        for (const auto &[packet_id, type] : packet_types(ctx->internal().mMetaCtx)) {
-            std::unordered_set<entt::id_type> seen;
-            if (holds_item(type, seen, 0)) {
-                found.insert(packet_id);
-            }
-        }
-        return found;
-    }();
-    return marked.contains(id);
+    }
+    slot.store(mode, std::memory_order_relaxed);
+    return DecodeMode::Eager;
 }
 
 nlohmann::ordered_json decode_fields(Packet &packet, const int id)
