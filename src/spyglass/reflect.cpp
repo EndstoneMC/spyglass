@@ -632,6 +632,22 @@ bool holds_item(const entt::meta_type &type, std::unordered_set<entt::id_type> &
     return false;
 }
 
+bool schema_members(const entt::meta_type &type, std::unordered_set<entt::id_type> &seen, const int depth)
+{
+    if (!type || depth > kDeepestType || !seen.insert(type_key(type)).second) {
+        return false;
+    }
+    if (type.data().begin() != type.data().end() || type.func(cereal::internal::kCustomGetter)) {
+        return true;
+    }
+    for (auto &&[base_id, base] : type.base()) {
+        if (schema_members(base.type(), seen, depth + 1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ctx &meta_ctx)
 {
     static const auto types = [&meta_ctx] {
@@ -693,6 +709,30 @@ DecodeMode decode_mode(const std::string_view name, const int id)
     }
     slot.store(mode, std::memory_order_relaxed);
     return DecodeMode::Eager;
+}
+
+bool has_fields(const int id)
+{
+    static std::array<std::atomic<std::int8_t>, 1024> known{};
+    if (id < 0 || id >= static_cast<int>(known.size())) {
+        return false;
+    }
+
+    auto &slot = known[static_cast<std::size_t>(id)];
+    if (const auto seen = slot.load(std::memory_order_relaxed); seen != 0) {
+        return seen == 2;
+    }
+
+    auto any = false;
+    if (const auto *ctx = reflection_ctx(); ctx != nullptr) {
+        const auto &types = packet_types(ctx->internal().mMetaCtx);
+        if (const auto entry = types.find(id); entry != types.end()) {
+            std::unordered_set<entt::id_type> walked;
+            any = schema_members(entry->second, walked, 0);
+        }
+    }
+    slot.store(any ? 2 : 1, std::memory_order_relaxed);
+    return any;
 }
 
 nlohmann::ordered_json decode_fields(Packet &packet, const int id)

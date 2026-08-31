@@ -17,6 +17,8 @@ enum class DecodeMode : std::int8_t {
 
 DecodeMode decode_mode(std::string_view name, int id);
 
+bool has_fields(int id);
+
 nlohmann::ordered_json decode_fields(Packet &packet, int id);
 nlohmann::ordered_json decode_body(int id, std::string_view body);
 

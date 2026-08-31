@@ -21,6 +21,7 @@
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/report.h"
 #include "spyglass/overlay/store.h"
+#include "spyglass/reflect.h"
 #include "spyglass/signature.h"
 
 namespace spyglass {
@@ -282,6 +283,12 @@ void advance_export(ExportJob &job, const Capture &capture)
                     ++job.unreadable;
                     return true;
                 }
+            }
+
+            if (job.options.details && blob.fields.is_null() && blob.body &&
+                decode_mode(record.name, record.id) != DecodeMode::Eager) {
+                blob.fields =
+                    decode_body(record.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()});
             }
 
             const Details details{.record = record, .body = blob.body, .error = std::move(blob.error)};

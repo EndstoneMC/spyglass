@@ -117,38 +117,32 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             ImGui::TreePop();
         }
 
+        const auto bare = record->unread == 0 && !has_fields(record->id);
+
+        ImGui::PushID(static_cast<int>(record->number));
         set_open(options);
-        if (ImGui::TreeNodeEx("packet", kBranch, "Bedrock Protocol: %.*s",
+        if (ImGui::TreeNodeEx("packet", bare ? kLeaf : kBranch, "Bedrock Protocol: %.*s (%d)",
                               record->name.empty() ? 7 : static_cast<int>(record->name.size()),
-                              record->name.empty() ? "unnamed" : record->name.data())) {
-            ImGui::TreeNodeEx("id", kLeaf, "Id: %d", record->id);
+                              record->name.empty() ? "unnamed" : record->name.data(), record->id) &&
+            !bare) {
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
             }
-            ImGui::PushID(static_cast<int>(record->number));
-            set_open(options);
-            if (ImGui::TreeNodeEx("fields", kBranch, "Fields")) {
-                const auto eager = decode_mode(record->name, record->id) == DecodeMode::Eager;
-                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-                ImGui::TreeNodeEx("mode", kLeaf, "%s", eager ? "read as it arrived" : "read when opened");
-                ImGui::PopStyleColor();
 
-                const auto fields = capture.fields(record->number);
-                if (fields && fields->is_object() && !fields->empty()) {
-                    std::string text;
-                    auto child = 0;
-                    for (const auto &[name, held] : fields->items()) {
-                        draw_node(options, text, name, held, child++, 0);
-                    }
+            const auto fields = capture.fields(record->number);
+            if (fields && fields->is_object() && !fields->empty()) {
+                std::string text;
+                auto child = 0;
+                for (const auto &[name, held] : fields->items()) {
+                    draw_node(options, text, name, held, child++, 0);
                 }
-                else {
-                    ImGui::TreeNodeEx("unavailable", kLeaf, "no fields decoded");
-                }
-                ImGui::TreePop();
             }
-            ImGui::PopID();
+            else {
+                ImGui::TreeNodeEx("unavailable", kLeaf, "no fields decoded");
+            }
             ImGui::TreePop();
         }
+        ImGui::PopID();
 
         if (!details->error.is_null()) {
             const auto stopped = length - std::min<std::size_t>(record->unread, length);
