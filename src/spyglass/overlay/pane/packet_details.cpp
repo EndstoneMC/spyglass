@@ -13,6 +13,7 @@
 #include "spyglass/overlay/options.h"
 #include "spyglass/overlay/report.h"
 #include "spyglass/overlay/theme.h"
+#include "spyglass/reflect.h"
 
 namespace spyglass {
 namespace {
@@ -127,6 +128,11 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             ImGui::PushID(static_cast<int>(record->number));
             set_open(options);
             if (ImGui::TreeNodeEx("fields", kBranch, "Fields")) {
+                const auto eager = decode_mode(record->name, record->id) == DecodeMode::Eager;
+                ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+                ImGui::TreeNodeEx("mode", kLeaf, "%s", eager ? "read as it arrived" : "read when opened");
+                ImGui::PopStyleColor();
+
                 const auto fields = capture.fields(record->number);
                 if (fields && fields->is_object() && !fields->empty()) {
                     std::string text;
