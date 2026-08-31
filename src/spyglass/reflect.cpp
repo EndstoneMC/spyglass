@@ -112,7 +112,13 @@ nlohmann::ordered_json text_or_bytes(const std::string_view raw)
         return std::string{raw};
     }
     const std::span bytes{reinterpret_cast<const std::uint8_t *>(raw.data()), raw.size()};
-    return std::format("atob({})", format_bytes(bytes, 0, BytesFormat::Base64));
+    const auto encoded = format_bytes(bytes, 0, BytesFormat::Base64);
+    std::string wrapped;
+    wrapped.reserve(encoded.size() + 6);
+    wrapped += "atob(";
+    wrapped += encoded;
+    wrapped += ')';
+    return wrapped;
 }
 
 bool value_of(nlohmann::ordered_json &out, const entt::meta_any &value)

@@ -51,6 +51,7 @@ std::string format_bytes(const std::span<const std::uint8_t> bytes, const std::s
         text += "\n};\n";
         break;
     case BytesFormat::Base64:
+        text.reserve(((bytes.size() + 2) / 3) * 4);
         for (std::size_t i = 0; i < bytes.size(); i += 3) {
             const auto remaining = bytes.size() - i;
             const auto triple = (static_cast<std::uint32_t>(bytes[i]) << 16) |
