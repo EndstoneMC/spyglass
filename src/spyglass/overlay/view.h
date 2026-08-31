@@ -7,6 +7,7 @@
 #include "spyglass/overlay/filter.h"
 #include "spyglass/overlay/options.h"
 #include "spyglass/overlay/pane/expert_window.h"
+#include "spyglass/overlay/pane/export_dialog.h"
 #include "spyglass/overlay/pane/filter_window.h"
 #include "spyglass/overlay/pane/packet_bytes.h"
 #include "spyglass/overlay/pane/packet_list.h"
@@ -43,6 +44,7 @@ private:
     PacketList list_;
     FilterWindow filter_window_;
     ExpertWindow expert_window_;
+    ExportDialog export_dialog_;
     BytesView bytes_view_;
     std::vector<DetachedPacket> detached_;
 };

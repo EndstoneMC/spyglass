@@ -163,6 +163,17 @@ std::string inspect(const std::span<const std::uint8_t> range)
 
 }  // namespace
 
+std::span<const std::uint8_t> selected_bytes(const BytesView &view, const std::span<const std::uint8_t> body)
+{
+    if (!view.selected) {
+        return body;
+    }
+    const auto first = std::min(view.anchor, view.cursor);
+    const auto last = std::max(view.anchor, view.cursor);
+    const auto from = std::min(first, body.size());
+    return body.subspan(from, std::min(last - first + 1, body.size() - from));
+}
+
 void draw_packet_bytes(const Details *const details, const std::uint64_t number, BytesView &view,
                        const ViewOptions &options, const float height)
 {
@@ -448,9 +459,8 @@ void draw_packet_bytes(const Details *const details, const std::uint64_t number,
         ImGui::OpenPopup("actions");
     }
     if (ImGui::BeginPopup("actions")) {
-        const auto from = std::min(view.selected ? first : std::size_t{0}, body.size());
-        const auto count = std::min(view.selected ? last - first + 1 : body.size(), body.size() - from);
-        const auto range = body.subspan(from, count);
+        const auto range = selected_bytes(view, body);
+        const auto from = body.empty() ? std::size_t{0} : static_cast<std::size_t>(range.data() - body.data());
 
         if (ImGui::BeginMenu("Copy", !range.empty())) {
             if (ImGui::MenuItem("Hex dump")) {

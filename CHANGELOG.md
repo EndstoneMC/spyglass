@@ -41,10 +41,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Edit` marks packets so they keep their place in a list scrolling past at speed, and `Go` moves
   between the marks.
 - `Edit` copies the selected row, the whole details tree, or every displayed row as text or CSV.
-- `File` writes the same things to a file under `%LOCALAPPDATA%\spyglass` (`~/.local/share/spyglass`
-  on the Linux launcher): the displayed packets as text or CSV, the selected packet's details or
-  bytes, and a summary of the session. There is no file picker inside the client, so the name is
-  generated and the menu says where the file landed.
+- `File` writes the capture out. `Export Packets...` takes the packets as text, CSV or JSON, and asks
+  which ones: all of them, the selected one, the marked ones, or a range written out, against either
+  everything captured or only what the filter is showing, and how much of each packet to write, the
+  summary line, the details tree, the bytes. It counts what each choice selects and estimates the
+  size first, and a long export runs a few milliseconds at a time behind a progress bar rather than
+  stopping the game. `Export Selected Packet Bytes...` writes the range selected in the bytes pane as
+  a raw file, and the whole body when nothing is selected. `Export Session Summary...` writes the
+  totals.
+- Exports go through a save dialog drawn in the overlay, since the overlay runs inside the client's
+  own present call and the Android build has no system dialog to open. It starts in
+  `%LOCALAPPDATA%\spyglass` (`~/.local/share/spyglass` on the Linux launcher), lists what is there,
+  takes a path typed in full, and says so before it overwrites a file.
 - `Analyze` opens the expert information window, which groups every failed decode by the reason the
   client gave and the packet it was reading, counts them, and jumps to the first of a group when you
   click it. It also turns on a readout under the hex view that reads the selected bytes as an

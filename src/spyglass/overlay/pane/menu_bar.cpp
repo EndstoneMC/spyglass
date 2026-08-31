@@ -11,7 +11,6 @@
 #include <imgui.h>
 
 #include "spyglass/network.h"
-#include "spyglass/overlay/bytes.h"
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/export.h"
 #include "spyglass/overlay/filter.h"
@@ -37,14 +36,6 @@ constexpr std::array<std::pair<const char *, StatisticsTab>, 4> kStatisticsTabs{
     {"I/O Graph", StatisticsTab::Graph},
 }};
 
-constexpr std::array<std::pair<const char *, BytesFormat>, 5> kByteFormats{{
-    {"Hex dump", BytesFormat::HexDump},
-    {"Hex stream", BytesFormat::HexStream},
-    {"Printable text", BytesFormat::Text},
-    {"C array", BytesFormat::CArray},
-    {"Base64", BytesFormat::Base64},
-}};
-
 void time_format(ViewOptions &options, const char *label, const TimeFormat format)
 {
     if (ImGui::MenuItem(label, nullptr, options.time_format == format)) {
@@ -63,27 +54,18 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
     auto open_goto = false;
 
     if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("Export Displayed Packets as Text")) {
-            options.export_message = export_capture(capture, filter, Export::DisplayedText, BytesFormat::HexDump);
+        if (ImGui::MenuItem("Export Packets...")) {
+            options.export_dialog = true;
+            options.export_command = ExportCommand::Packets;
         }
-        if (ImGui::MenuItem("Export Displayed Packets as CSV")) {
-            options.export_message = export_capture(capture, filter, Export::DisplayedCsv, BytesFormat::HexDump);
-        }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Export Selected Packet Details")) {
-            options.export_message = export_capture(capture, filter, Export::SelectedDetails, BytesFormat::HexDump);
-        }
-        if (ImGui::BeginMenu("Export Selected Packet Bytes")) {
-            for (const auto &[label, format] : kByteFormats) {
-                if (ImGui::MenuItem(label)) {
-                    options.export_message = export_capture(capture, filter, Export::SelectedBytes, format);
-                }
-            }
-            ImGui::EndMenu();
+        if (ImGui::MenuItem("Export Selected Packet Bytes...", nullptr, false, capture.selected() != 0)) {
+            options.export_dialog = true;
+            options.export_command = ExportCommand::SelectedBytes;
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Export Session Summary")) {
-            options.export_message = export_capture(capture, filter, Export::Summary, BytesFormat::HexDump);
+        if (ImGui::MenuItem("Export Session Summary...")) {
+            options.export_dialog = true;
+            options.export_command = ExportCommand::Summary;
         }
         ImGui::EndMenu();
     }
@@ -139,7 +121,7 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
             }
             if (ImGui::MenuItem("Packet Details", nullptr, false, selected != 0)) {
                 if (const auto selection = capture.selected_details()) {
-                    ImGui::SetClipboardText(report_details(*selection).c_str());
+                    ImGui::SetClipboardText(report_details(*selection, true).c_str());
                 }
             }
             ImGui::Separator();
@@ -344,22 +326,6 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
             }
         }
         if (go || cancel) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    if (!options.export_message.empty() && !ImGui::IsPopupOpen("Export")) {
-        ImGui::OpenPopup("Export");
-    }
-    if (ImGui::BeginPopupModal("Export", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted(options.export_message.c_str());
-        if (ImGui::Button("Copy path")) {
-            ImGui::SetClipboardText(options.export_message.c_str());
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Close")) {
-            options.export_message.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

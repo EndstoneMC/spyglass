@@ -1,10 +1,9 @@
 #include "spyglass/core/output.h"
 
+#include <string>
 #include <system_error>
 
 #ifdef _WIN32
-
-#include <string>
 
 #include <Windows.h>
 
@@ -51,6 +50,17 @@ const std::filesystem::path &output_directory()
 {
     static const std::filesystem::path directory = create();
     return directory;
+}
+
+std::string path_text(const std::filesystem::path &path)
+{
+    const auto text = path.u8string();
+    return std::string{text.begin(), text.end()};
+}
+
+std::filesystem::path path_of(const std::string_view text)
+{
+    return std::filesystem::path{std::u8string{text.begin(), text.end()}};
 }
 
 }  // namespace spyglass

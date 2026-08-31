@@ -55,7 +55,7 @@ std::string report_node(const Node &node, const int depth)
     return text;
 }
 
-std::string report_details(const Details &details)
+std::string report_details(const Details &details, const bool bytes)
 {
     const auto &record = details.record;
     const std::span<const std::uint8_t> body = details.body ? std::span{*details.body}
@@ -72,7 +72,9 @@ std::string report_details(const Details &details)
         text += std::format("Decode error at 0x{:X}\n", stopped);
         text += report_node(*details.error, 1);
     }
-    text += format_bytes(body, 0, BytesFormat::HexDump);
+    if (bytes) {
+        text += format_bytes(body, 0, BytesFormat::HexDump);
+    }
     return text;
 }
 

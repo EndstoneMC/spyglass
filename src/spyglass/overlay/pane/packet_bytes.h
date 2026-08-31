@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,8 @@ struct BytesView {
     float line{0.0F};
     float advance[95]{};
 };
+
+std::span<const std::uint8_t> selected_bytes(const BytesView &view, std::span<const std::uint8_t> body);
 
 void draw_packet_bytes(const Details *details, std::uint64_t number, BytesView &view, const ViewOptions &options,
                        float height);

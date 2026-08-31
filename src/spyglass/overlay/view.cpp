@@ -8,6 +8,7 @@
 #include <imgui.h>
 
 #include "spyglass/overlay/pane/expert_window.h"
+#include "spyglass/overlay/pane/export_dialog.h"
 #include "spyglass/overlay/pane/filter_window.h"
 #include "spyglass/overlay/pane/menu_bar.h"
 #include "spyglass/overlay/pane/packet_bytes.h"
@@ -56,6 +57,8 @@ void View::onPacketReceive(Incoming incoming)
 
 void View::draw()
 {
+    advance_export(export_dialog_.job, capture_);
+
     if (!visible_) {
         return;
     }
@@ -90,8 +93,14 @@ void View::draw()
         draw_statistics_window(capture_, options_);
     }
 
+    if (options_.export_dialog || export_dialog_.job.running || !export_dialog_.job.message.empty()) {
+        draw_export_dialog(capture_, filter_, list_, bytes_view_, export_dialog_, options_);
+    }
+
     ImGui::SetNextWindowSize(ImVec2{960.0F, 720.0F}, ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("Spyglass", &visible_, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
+    if (ImGui::Begin("Spyglass", &visible_,
+                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar |
+                         ImGuiWindowFlags_NoBringToFrontOnFocus)) {
         draw_menu_bar(capture_, filter_, list_, options_);
         draw_toolbar(capture_, filter_, options_.filter_window);
         if (options_.find_bar) {

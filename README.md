@@ -84,10 +84,18 @@ The capture file is a scratch file, named like `spyglass_A1b2C3.cap` in the syst
 when the client does. A file left behind by a client that crashed is removed the next time spyglass is injected: the
 running one holds a lock on its own file, so the sweep can tell a live capture from an abandoned one.
 
-`File` writes what you ask it to under
-`%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher: the displayed packets as text or CSV,
-the selected packet's details or bytes, and a summary of the session. There is no file picker inside the client, so
-the name is generated and the menu says where the file landed.
+`File` writes the capture out. `Export Packets...` takes the packets as text, CSV or JSON, and asks which ones: all of
+them, the selected one, the marked ones, or a range you write out, against either everything captured or only what the
+filter is showing. It also asks how much of each packet to write, the summary line, the details tree, the bytes, or any
+combination. It counts what each choice selects and estimates the size before you commit to it, and a long export runs
+a few milliseconds at a time with a progress bar and a Cancel button rather than stopping the game.
+`Export Selected Packet Bytes...` writes the range selected in the bytes pane as a raw file with nothing added, and the
+whole body when nothing is selected. `Export Session Summary...` writes the totals.
+
+The save dialog is drawn in the overlay rather than by the system, because the overlay runs on the render thread inside
+the client's own present call and the Android build has no system dialog to open. It starts in
+`%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher, lists the directory it is in, takes a
+path typed in full, and says so before it overwrites a file.
 
 ## Quick Start
 

@@ -1,7 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
+
+#include "spyglass/overlay/export.h"
 
 namespace spyglass {
 
@@ -41,8 +42,9 @@ struct ViewOptions {
     bool statistics_select{false};
     StatisticsTab statistics_tab{StatisticsTab::Properties};
     bool graph_bytes{false};
+    bool export_dialog{false};
+    ExportCommand export_command{ExportCommand::Packets};
     char goto_number[16]{};
-    std::string export_message;
 };
 
 }  // namespace spyglass
