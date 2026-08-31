@@ -3,7 +3,10 @@ project(spyglass VERSION 0.2.0 LANGUAGES CXX)
 
 if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-elseif (NOT (ANDROID AND ANDROID_ABI STREQUAL "x86_64"))
+    set(default_clients "1.26.40.5;1.26.50.27-preview")
+elseif (ANDROID AND ANDROID_ABI STREQUAL "x86_64")
+    set(default_clients "1.26.40.5")
+else ()
     message(FATAL_ERROR "spyglass targets 64-bit Windows, or Android x86_64 for the Linux launcher")
 endif ()
 
@@ -11,9 +14,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(MINECRAFT_CLIENTS "${default_clients}" CACHE STRING
+        "Minecraft client builds to target, e.g. 1.26.40.5;1.26.50.27-preview")
+
 add_subdirectory(third_party)
 
-add_library(spyglass SHARED
+set(sources
         src/spyglass/core/output.cpp
         src/spyglass/error.cpp
         src/spyglass/filename.cpp
@@ -49,27 +55,63 @@ add_library(spyglass SHARED
         src/spyglass/pattern.cpp
         src/spyglass/reflect.cpp
         src/spyglass/signature.cpp)
-target_include_directories(spyglass PRIVATE src)
-target_compile_definitions(spyglass PRIVATE SPYGLASS_VERSION="${PROJECT_VERSION}")
-target_link_libraries(spyglass PRIVATE
-        EnTT::EnTT
-        nonstd::expected-lite
-        funchook-static
-        imgui
-        libhat::libhat
-        nlohmann_json::nlohmann_json)
 
-if (ANDROID)
-    target_link_libraries(spyglass PRIVATE log)
-endif ()
+foreach (client IN LISTS MINECRAFT_CLIENTS)
+    if (NOT "${client}" MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)(-preview)?$")
+        message(FATAL_ERROR "a MINECRAFT_CLIENTS entry reads 1.26.50.27 or 1.26.50.27-preview, not '${client}'")
+    endif ()
+    set(version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}.${CMAKE_MATCH_4}")
+    set(tag "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+    if (WIN32)
+        set(name "Windows ${tag}")
+    else ()
+        set(name "Android x86_64 ${tag}")
+    endif ()
+    if (CMAKE_MATCH_5)
+        set(preview 1)
+        string(APPEND tag ".preview")
+        string(APPEND name " preview")
+    else ()
+        set(preview 0)
+    endif ()
+    entt_for_client(${version} entt)
+    message(STATUS "Minecraft client: ${name} (${version}), ${entt}")
 
-install(TARGETS spyglass RUNTIME DESTINATION . LIBRARY DESTINATION .)
+    set(target spyglass-${tag})
+    add_library(${target} SHARED ${sources})
+    target_include_directories(${target} PRIVATE src)
+    target_compile_definitions(${target} PRIVATE
+            SPYGLASS_VERSION="${PROJECT_VERSION}"
+            MINECRAFT_CLIENT="${name}"
+            MINECRAFT_VERSION_MAJOR=${CMAKE_MATCH_1}
+            MINECRAFT_VERSION_MINOR=${CMAKE_MATCH_2}
+            MINECRAFT_VERSION_PATCH=${CMAKE_MATCH_3}
+            MINECRAFT_VERSION_BUILD=${CMAKE_MATCH_4}
+            MINECRAFT_PREVIEW=${preview})
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME spyglass-${PROJECT_VERSION}-${tag})
+    target_link_libraries(${target} PRIVATE
+            ${entt}
+            nonstd::expected-lite
+            funchook-static
+            imgui
+            libhat::libhat
+            nlohmann_json::nlohmann_json)
+
+    if (ANDROID)
+        target_link_libraries(${target} PRIVATE log)
+    endif ()
+
+    install(TARGETS ${target} RUNTIME DESTINATION . LIBRARY DESTINATION .)
+    if (WIN32)
+        install(FILES $<TARGET_PDB_FILE:${target}> DESTINATION . OPTIONAL)
+    endif ()
+endforeach ()
+
 install(FILES LICENSE README.md DESTINATION .)
 
 if (WIN32)
-    install(FILES $<TARGET_PDB_FILE:spyglass> DESTINATION . OPTIONAL)
-
     add_executable(spyglass_injector src/injector/main.cpp)
+    target_compile_definitions(spyglass_injector PRIVATE SPYGLASS_VERSION="${PROJECT_VERSION}")
     target_link_libraries(spyglass_injector PRIVATE advapi32 shell32)
     target_link_options(spyglass_injector PRIVATE /DEBUG:NONE)
     set_target_properties(spyglass_injector PROPERTIES OUTPUT_NAME spyglass)

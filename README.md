@@ -112,9 +112,15 @@ spyglass.exe
 It asks for administrator rights on its way in, because Minecraft is a packaged app and opening a handle to one
 needs them, and the elevated run carries on in a window of its own.
 
+The zip holds one DLL per client build. The injector reads the running client's version and whether it is the
+preview one, and loads the newest payload beside it that does not sit above that version, so
+`spyglass-0.2.0-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.2.0-1.26.50.preview.dll` serves
+the preview. A payload you built for some other version is picked up the same way if you drop it in beside the
+others.
+
 | option | |
 | --- | --- |
-| `--dll <path>` | a payload somewhere other than beside the executable |
+| `--dll <path>` | a payload of your choosing, instead of the one the version match would pick |
 | `--process <name>` | a client process other than `Minecraft.Windows.exe` |
 
 Press **Insert** in game for the overlay.
@@ -129,10 +135,11 @@ There the game runs under the
 [Minecraft Bedrock Launcher](https://github.com/minecraft-linux/mcpelauncher-manifest), which loads shared objects
 as mods, so there is no injector and nothing to elevate. Unpack `spyglass-vX.Y.Z-linux-x64.zip` from the
 [releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below, then put the shared
-object where the launcher looks:
+object where the launcher looks. There is no injector to pick a payload for you, so name the one that matches the
+client your launcher runs:
 
 ```shell
-install -D libspyglass.so ~/.local/share/mcpelauncher/mods/spyglass/0.2.0/x86_64/libspyglass.so
+install -D libspyglass-0.2.0-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.2.0/x86_64/libspyglass.so
 ```
 
 Write a `mod.json` beside it naming the mod:
@@ -160,7 +167,7 @@ cmake --preset relwithdebinfo-windows
 cmake --build --preset relwithdebinfo-windows
 ```
 
-`spyglass.dll` and `spyglass.exe` land in `build/relwithdebinfo-windows`.
+`spyglass.exe` and one DLL per client build land in `build/relwithdebinfo-windows`.
 
 ### Linux launcher mod
 
@@ -174,24 +181,38 @@ cmake --preset relwithdebinfo-android
 cmake --build --preset relwithdebinfo-android
 ```
 
-`libspyglass.so` lands in `build/relwithdebinfo-android`.
+One shared object per client build lands in `build/relwithdebinfo-android`.
 
 `release-windows`, `release-android` and `debug-android` configure the same way. CI builds the `relwithdebinfo`
 preset for each platform and uploads what `cmake --install` stages.
 
+### Targeting another client
+
+`MINECRAFT_CLIENTS` is the list of client builds a configure produces a payload for, one target each. The default
+is what CI ships, and any four-component version works, with `-preview` on the ones that are:
+
+```shell
+cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40.5;1.26.50.27-preview"
+```
+
+The version reaches the code as `MINECRAFT_VERSION_HEX`, which is what selects the EnTT revision the client was
+compiled against, the shape of the reflection structs it exposes, and the patterns to scan for. A version no
+pattern set covers fails the build rather than producing a payload that would scan the wrong bytes.
+
 ## Client Versions
 
-| client | builds |
+| payload | client builds |
 | --- | --- |
-| Windows release | 1.26.40.5, 1.26.44.3 |
-| Windows preview | 1.26.50.27 |
-| Android x86_64, for the Linux launcher | 1.26.44.3 |
+| `spyglass-0.2.0-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3 |
+| `spyglass-0.2.0-1.26.50.preview.dll` | Windows preview 1.26.50.27 |
+| `libspyglass-0.2.0-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
-Release and preview are separate builds of the game and their patterns differ, so Spyglass reads the client's own
-name out of the running process and picks the matching set before it scans. One artifact covers both, and a pattern
-cut against one build is never scanned against the other.
+Release and preview are separate builds of the game, and 1.26.50 changed the reflection structs the field decoder
+reads, so a payload is built for one client line and carries only that line's patterns and struct layouts. On
+Windows the injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was
+not built for says so in the errors window and installs no hooks, rather than reading the wrong layout.
 
-Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied to a single release, and in
+Spyglass finds what it needs by scanning the client for byte patterns, so it is not tied to a single build, and in
 practice a set carries across the builds of a line. It will not guess, though. If a pattern no longer matches
 exactly one place it refuses to install that hook and says so in the errors window rather than risk patching the
 wrong function, so a client update can need the patterns refreshed. If the packet count stays at zero while you are

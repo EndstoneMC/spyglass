@@ -15,6 +15,8 @@
 #include <entt/meta/context.hpp>
 #include <entt/meta/meta.hpp>
 
+#include "bedrock/version.h"
+
 namespace cereal {
 
 enum class SerializationTraits : std::uint8_t {
@@ -62,10 +64,16 @@ enum class MemberTraits : std::uint16_t {
     isRequired = 1,
     isDefaultSetter = 2,
     isMemberLevelSetterGetter = 4,
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
     isKeyedSetterGetter = 8,
     isConstSelector = 16,
     hasDefaultValue = 32,
     isPatternMember = 64,
+#else
+    isConstSelector = 8,
+    hasDefaultValue = 16,
+    isPatternMember = 32,
+#endif
 };
 
 using UserPropertiesMap = entt::dense_map<std::string,
@@ -105,7 +113,9 @@ public:
         std::unique_ptr<Constraint> mConstraint;
         std::string mNameExt;
         std::string mName;
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
         entt::meta_type (*mDynamicSetterArgCtor)(const entt::meta_ctx &);
+#endif
         UserPropertiesMap mUserPropertiesMap;
         OverridingSet mOverridingTypes;
         std::string mErrorMessage;
@@ -132,10 +142,16 @@ static_assert(sizeof(UserPropertiesMap) == 72);
 static_assert(sizeof(BasicSchema::TypeDescriptor) == 0xC0);
 static_assert(offsetof(BasicSchema::TypeDescriptor, mName) == 0x08);
 static_assert(offsetof(BasicSchema::TypeDescriptor, mUserPropertiesMap) == 0x40);
-static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE8);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mName) == 0x30);
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
+static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE8);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mUserPropertiesMap) == 0x58);
 static_assert(offsetof(BasicSchema::MemberDescriptor, mSerializationTraits) == 0xD8);
+#else
+static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE0);
+static_assert(offsetof(BasicSchema::MemberDescriptor, mUserPropertiesMap) == 0x50);
+static_assert(offsetof(BasicSchema::MemberDescriptor, mSerializationTraits) == 0xD0);
+#endif
 static_assert(sizeof(BasicSchema::GetterDescriptor) == 0x10);
 static_assert(sizeof(BasicSchema::SetterDescriptor) == 0x18);
 #endif

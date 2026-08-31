@@ -1,4 +1,6 @@
+#include <array>
 #include <cstdio>
+#include <cwchar>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -10,13 +12,15 @@
 
 #include <AccCtrl.h>
 #include <AclAPI.h>
+#include <appmodel.h>
 #include <ShellAPI.h>
 #include <TlHelp32.h>
 
 namespace {
 
 constexpr auto kDefaultProcess = L"Minecraft.Windows.exe";
-constexpr auto kDefaultModule = L"spyglass.dll";
+constexpr std::wstring_view kPayloadPrefix = L"spyglass-" SPYGLASS_VERSION L"-";
+constexpr auto kPreviewPackage = L"Microsoft.MinecraftWindowsBeta";
 
 struct HandleDeleter {
     void operator()(HANDLE handle) const noexcept
@@ -141,20 +145,130 @@ std::optional<DWORD> find_process(const std::wstring &name)
     return std::nullopt;
 }
 
-bool module_loaded(const DWORD pid, const std::wstring &name)
+std::optional<std::wstring> loaded_payload(const DWORD pid, const std::wstring &name)
 {
     const UniqueHandle snapshot{CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid)};
     if (snapshot.get() == INVALID_HANDLE_VALUE) {
-        return false;
+        return std::nullopt;
     }
 
     MODULEENTRY32W entry{.dwSize = sizeof(MODULEENTRY32W)};
     for (auto ok = Module32FirstW(snapshot.get(), &entry); ok; ok = Module32NextW(snapshot.get(), &entry)) {
-        if (_wcsicmp(entry.szModule, name.c_str()) == 0) {
-            return true;
+        const std::wstring_view module{entry.szModule};
+        if (module.starts_with(L"spyglass-") || _wcsicmp(entry.szModule, name.c_str()) == 0) {
+            return std::wstring{module};
         }
     }
-    return false;
+    return std::nullopt;
+}
+
+struct Client {
+    bool preview;
+    std::array<unsigned, 4> version;
+};
+
+std::optional<Client> identify(const HANDLE process)
+{
+    UINT32 length = 0;
+    if (GetPackageFullName(process, &length, nullptr) != ERROR_INSUFFICIENT_BUFFER) {
+        std::fwprintf(stderr, L"error: the client runs without a package identity to read its version from\n");
+        return std::nullopt;
+    }
+
+    std::wstring package(length, L'\0');
+    if (const auto status = GetPackageFullName(process, &length, package.data()); status != ERROR_SUCCESS) {
+        report(L"GetPackageFullName", status);
+        return std::nullopt;
+    }
+    package.resize(length - 1);
+
+    const auto name_end = package.find(L'_');
+    const auto version_end = package.find(L'_', name_end + 1);
+    if (version_end == std::wstring::npos) {
+        std::fwprintf(stderr, L"error: %s is not a package full name\n", package.c_str());
+        return std::nullopt;
+    }
+
+    std::array<unsigned, 3> numbers{};
+    std::wstring_view fields{package.data() + name_end + 1, version_end - name_end - 1};
+    for (auto &number : numbers) {
+        const auto dot = fields.find(L'.');
+        number = static_cast<unsigned>(std::wcstoul(std::wstring{fields.substr(0, dot)}.c_str(), nullptr, 10));
+        fields = dot == std::wstring_view::npos ? std::wstring_view{} : fields.substr(dot + 1);
+    }
+    const auto patch_and_build = numbers[2];
+
+    return Client{
+        .preview = package.starts_with(kPreviewPackage),
+        .version = {numbers[0], numbers[1], patch_and_build / 100, patch_and_build % 100},
+    };
+}
+
+struct Target {
+    bool preview;
+    std::array<unsigned, 3> version;
+};
+
+std::optional<Target> parse_target(std::wstring_view tag)
+{
+    constexpr std::wstring_view kPreviewSuffix = L".preview";
+    Target target{.preview = tag.ends_with(kPreviewSuffix)};
+    if (target.preview) {
+        tag.remove_suffix(kPreviewSuffix.size());
+    }
+
+    for (auto &component : target.version) {
+        const auto dot = tag.find(L'.');
+        const auto text = tag.substr(0, dot);
+        if (text.empty() || text.find_first_not_of(L"0123456789") != std::wstring_view::npos) {
+            return std::nullopt;
+        }
+        component = static_cast<unsigned>(std::wcstoul(std::wstring{text}.c_str(), nullptr, 10));
+        tag = dot == std::wstring_view::npos ? std::wstring_view{} : tag.substr(dot + 1);
+    }
+    return tag.empty() ? std::optional{target} : std::nullopt;
+}
+
+std::optional<std::filesystem::path> select_payload(const std::filesystem::path &directory, const Client &client)
+{
+    const std::array<unsigned, 3> running{client.version[0], client.version[1], client.version[2]};
+    std::optional<Target> best;
+    std::filesystem::path chosen;
+    std::vector<std::wstring> offered;
+
+    std::error_code ec;
+    for (const auto &entry : std::filesystem::directory_iterator{directory, ec}) {
+        const auto name = entry.path().filename().wstring();
+        if (!name.starts_with(kPayloadPrefix) || _wcsicmp(entry.path().extension().c_str(), L".dll") != 0) {
+            continue;
+        }
+        const auto stem = entry.path().stem().wstring();
+        const auto target = parse_target(std::wstring_view{stem}.substr(kPayloadPrefix.size()));
+        if (!target) {
+            continue;
+        }
+        offered.push_back(name);
+        if (target->preview != client.preview || target->version > running) {
+            continue;
+        }
+        if (!best || target->version > best->version) {
+            best = target;
+            chosen = entry.path();
+        }
+    }
+
+    if (!best) {
+        std::fwprintf(stderr, L"error: none of the payloads beside the injector target this client\n");
+        for (const auto &name : offered) {
+            std::fwprintf(stderr, L"       %s\n", name.c_str());
+        }
+        if (offered.empty()) {
+            std::fwprintf(stderr, L"       %s*.dll matched nothing in %s\n", std::wstring{kPayloadPrefix}.c_str(),
+                          directory.c_str());
+        }
+        return std::nullopt;
+    }
+    return chosen;
 }
 
 bool grant_app_package_access(const std::filesystem::path &path, const bool inherit)
@@ -243,17 +357,16 @@ bool load_remotely(const HANDLE process, const std::filesystem::path &payload)
     return ok;
 }
 
-bool inject(const DWORD pid, const std::filesystem::path &payload)
+UniqueHandle open_client(const DWORD pid)
 {
     constexpr DWORD kAccess =
         PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ;
-    const UniqueHandle process{OpenProcess(kAccess, FALSE, pid)};
+    UniqueHandle process{OpenProcess(kAccess, FALSE, pid)};
     if (!process) {
         report(L"OpenProcess");
         std::fwprintf(stderr, L"hint: injecting into a packaged app needs an elevated prompt\n");
-        return false;
     }
-    return load_remotely(process.get(), payload);
+    return process;
 }
 
 }  // namespace
@@ -284,10 +397,33 @@ int wmain(const int argc, wchar_t **argv)
 
     ConsoleHold hold;
 
+    const auto pid = find_process(process_name);
+    if (!pid) {
+        std::fwprintf(stderr, L"error: %s is not running\n", process_name.c_str());
+        return 1;
+    }
+
+    const auto process = open_client(*pid);
+    if (!process) {
+        return 1;
+    }
+
     if (payload.empty()) {
+        const auto client = identify(process.get());
+        if (!client) {
+            std::fwprintf(stderr, L"hint: name the payload yourself with --dll <path>\n");
+            return 1;
+        }
+        std::wprintf(L"client: Minecraft%s %u.%u.%u.%u\n", client->preview ? L" Preview" : L"", client->version[0],
+                     client->version[1], client->version[2], client->version[3]);
+
         std::wstring self(MAX_PATH, L'\0');
         self.resize(GetModuleFileNameW(nullptr, self.data(), static_cast<DWORD>(self.size())));
-        payload = std::filesystem::path{self}.parent_path() / kDefaultModule;
+        auto chosen = select_payload(std::filesystem::path{self}.parent_path(), *client);
+        if (!chosen) {
+            return 1;
+        }
+        payload = std::move(*chosen);
     }
 
     std::error_code ec;
@@ -296,21 +432,15 @@ int wmain(const int argc, wchar_t **argv)
         std::fwprintf(stderr, L"error: cannot find the payload: %hs\n", ec.message().c_str());
         return 1;
     }
-
-    const auto pid = find_process(process_name);
-    if (!pid) {
-        std::fwprintf(stderr, L"error: %s is not running\n", process_name.c_str());
-        return 1;
-    }
-    if (module_loaded(*pid, payload.filename().wstring())) {
-        std::fwprintf(stderr, L"error: %s is already loaded in pid %lu\n", payload.filename().c_str(), *pid);
+    if (const auto loaded = loaded_payload(*pid, payload.filename().wstring())) {
+        std::fwprintf(stderr, L"error: %s is already loaded in pid %lu\n", loaded->c_str(), *pid);
         return 1;
     }
 
     if (!grant_app_package_access(payload.parent_path(), true) || !grant_app_package_access(payload, false)) {
         return 1;
     }
-    if (!inject(*pid, payload)) {
+    if (!load_remotely(process.get(), payload)) {
         return 1;
     }
 

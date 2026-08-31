@@ -30,6 +30,7 @@
 #include "bedrock/nbt/tag.h"
 #include "bedrock/network/packet.h"
 #include "bedrock/platform/uuid.h"
+#include "bedrock/version.h"
 #include "spyglass/network.h"
 #include "spyglass/overlay/capture.h"
 
@@ -46,6 +47,17 @@ namespace {
 constexpr int kMaxDepth = 64;
 constexpr std::size_t kMaxText = 96;
 constexpr std::size_t kMaxBytes = 16;
+
+template <typename T>
+entt::id_type type_key(const T &type)
+{
+    if constexpr (requires { type.id(); }) {
+        return type.id();
+    }
+    else {
+        return type.alias();
+    }
+}
 
 template <template <typename...> class T>
 bool is_specialization(const entt::meta_type &type)
@@ -305,11 +317,11 @@ void append_members(Node &node, entt::meta_any &value, const int depth)
     const auto type = value.type();
     for (auto &&[base_id, base] : type.base()) {
         const auto base_type = base.type();
-        if (!base_type || base_type.id() == type.id()) {
+        if (!base_type || type_key(base_type) == type_key(type)) {
             continue;
         }
         if (auto upcast = value.as_ref();
-            upcast.allow_cast(base_type) && upcast.type().id() != type.id()) {
+            upcast.allow_cast(base_type) && type_key(upcast.type()) != type_key(type)) {
             append_members(node, upcast, depth + 1);
         }
     }
@@ -324,6 +336,7 @@ void append_members(Node &node, entt::meta_any &value, const int depth)
             name = std::string{data.name()};
         }
 
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
         const auto *context = reflection_ctx();
         if (descriptor != nullptr && descriptor->mDynamicSetterArgCtor != nullptr && context != nullptr) {
             using Serialize = entt::meta_any (*)(const entt::meta_any &, const cereal::SerializerContext &);
@@ -345,6 +358,7 @@ void append_members(Node &node, entt::meta_any &value, const int depth)
             added = true;
             continue;
         }
+#endif
 
         append(node, data.get(value), std::move(name), depth + 1);
         added = true;
@@ -504,7 +518,12 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         if (bases.begin() == bases.end() && member != members.end()) {
             const auto only = member->second;
             const cereal::internal::BasicSchema::MemberDescriptor *descriptor = only.custom();
-            if (++member == members.end() && (descriptor == nullptr || descriptor->mDynamicSetterArgCtor == nullptr)) {
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
+            const auto plain = descriptor == nullptr || descriptor->mDynamicSetterArgCtor == nullptr;
+#else
+            const auto plain = true;
+#endif
+            if (++member == members.end() && plain) {
                 if (auto wrapped = only.get(value); wrapped) {
                     std::string inner = descriptor != nullptr ? descriptor->mName : std::string{};
                     if (inner.empty()) {
@@ -519,14 +538,14 @@ void append(Node &parent, entt::meta_any value, std::string name, const int dept
         Node node{.label = name};
         append_members(node, value, depth);
         if (node.children.empty()) {
-            node.label = std::format("{}: <class \"{}\" id {:#x} size {}>", name, type.info().name(), type.id(),
+            node.label = std::format("{}: <class \"{}\" id {:#x} size {}>", name, type.info().name(), type_key(type),
                                      type.size_of());
         }
         parent.children.push_back(std::move(node));
         return;
     }
 
-    parent.children.push_back({.label = std::format("{}: <\"{}\" id {:#x} size {}{}{}>", name, type.info().name(), type.id(),
+    parent.children.push_back({.label = std::format("{}: <\"{}\" id {:#x} size {}{}{}>", name, type.info().name(), type_key(type),
                                                     type.size_of(), type.is_enum() ? " enum" : "",
                                                     type.is_class() ? " class" : "")});
 }

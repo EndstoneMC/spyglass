@@ -74,6 +74,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING**: a release now carries one payload per client build, named for the oldest client it
+  serves: `spyglass-0.2.0-1.26.40.dll` for the release client, `spyglass-0.2.0-1.26.50.preview.dll`
+  for the preview one, and `libspyglass-0.2.0-1.26.40.so` for the Linux launcher. There is no
+  `spyglass.dll` or `libspyglass.so` any more. On Windows `spyglass.exe` reads the running client's
+  version and picks the payload for you, so nothing changes about how it is run; on Linux, install
+  the shared object whose version matches the client your launcher runs. `--dll` still names a
+  payload by hand.
+  1.26.50 rebuilt the reflection the field decoder reads out of the client, which is why a single
+  payload can no longer cover both lines.
+- A payload loaded into a client it was not built for now says which one to load instead, in the
+  errors window, and installs no hooks. It used to read the wrong struct layout without noticing.
+- An overlay that fails to install says so in a message box. It is the window the errors window
+  itself lives in, so its own failure had nowhere to be reported and the run looked silent.
 - The capture has no length limit. Packet bodies are written to a file as they arrive and read back
   when a packet is shown, so a session runs until the disk fills rather than until a budget is spent,
   and the first packet is still there hours later. What stays in memory is a 32 byte entry per packet,

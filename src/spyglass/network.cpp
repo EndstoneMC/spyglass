@@ -130,6 +130,7 @@ namespace spyglass {
 
 void install_network_hook()
 {
+    verify_client();
     const auto &signature = signatures();
     g_create_packet = find(signature.create_packet);
     g_hooks.create_packet = g_create_packet;
