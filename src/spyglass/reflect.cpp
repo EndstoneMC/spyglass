@@ -228,8 +228,12 @@ bool value_of(nlohmann::ordered_json &out, const entt::meta_any &value)
     return false;
 }
 
+using KeyIndex = std::optional<std::unordered_set<std::string>>;
+
+constexpr std::size_t kIndexedFrom = 256;
+
 void put(nlohmann::ordered_json &parent, std::string name, nlohmann::ordered_json value,
-         std::unordered_set<std::string> *const seen = nullptr)
+         KeyIndex *const seen = nullptr)
 {
     if (parent.is_array()) {
         parent.push_back(std::move(value));
@@ -240,9 +244,17 @@ void put(nlohmann::ordered_json &parent, std::string name, nlohmann::ordered_jso
     }
 
     auto &entries = parent.get_ref<nlohmann::ordered_json::object_t &>();
-    const auto taken = [&entries, seen](const std::string &key) {
-        return seen != nullptr ? seen->contains(key)
-                               : std::ranges::any_of(entries, [&key](const auto &entry) { return entry.first == key; });
+    if (seen != nullptr && !seen->has_value() && entries.size() >= kIndexedFrom) {
+        auto &index = seen->emplace();
+        index.reserve(entries.size());
+        for (const auto &entry : entries) {
+            index.insert(entry.first);
+        }
+    }
+    const auto indexed = seen != nullptr && seen->has_value();
+    const auto taken = [&entries, seen, indexed](const std::string &key) {
+        return indexed ? (*seen)->contains(key)
+                       : std::ranges::any_of(entries, [&key](const auto &entry) { return entry.first == key; });
     };
     if (taken(name)) {
         const auto base = name;
@@ -250,8 +262,8 @@ void put(nlohmann::ordered_json &parent, std::string name, nlohmann::ordered_jso
             name = std::format("{}#{}", base, suffix);
         }
     }
-    if (seen != nullptr) {
-        seen->insert(name);
+    if (indexed) {
+        (*seen)->insert(name);
     }
     entries.emplace_back(std::move(name), std::move(value));
 }
@@ -263,7 +275,7 @@ constexpr int kMaxTagNodes = 4096;
 thread_local int g_tag_nodes = 0;
 
 void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type type, const std::string_view name,
-                const int depth, std::unordered_set<std::string> *const seen = nullptr)
+                const int depth, KeyIndex *const seen = nullptr)
 {
     if (depth > kMaxTagDepth || ++g_tag_nodes > kMaxTagNodes) {
         return;
@@ -306,7 +318,7 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
     case Tag::Type::Compound: {
         const auto &tags = static_cast<const CompoundTag &>(tag).rawView();
         auto node = nlohmann::ordered_json::object();
-        std::unordered_set<std::string> keys;
+        KeyIndex keys;
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), key, depth + 1, &keys);
         }
@@ -325,9 +337,11 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
     }
 }
 
-void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string name, int depth);
+void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string name, int depth,
+            KeyIndex *seen);
 
-void append_members(nlohmann::ordered_json &node, entt::meta_any &value, const int depth)
+void append_members(nlohmann::ordered_json &node, entt::meta_any &value, const int depth,
+                    KeyIndex *const seen)
 {
     const auto type = value.type();
     for (auto &&[base_id, base] : type.base()) {
@@ -336,7 +350,7 @@ void append_members(nlohmann::ordered_json &node, entt::meta_any &value, const i
             continue;
         }
         if (auto upcast = value.as_ref(); upcast.allow_cast(base_type) && type_key(upcast.type()) != type_key(type)) {
-            append_members(node, upcast, depth + 1);
+            append_members(node, upcast, depth + 1, seen);
         }
     }
     auto added = false;
@@ -361,33 +375,34 @@ void append_members(nlohmann::ordered_json &node, entt::meta_any &value, const i
             if (slot != nullptr && *slot != nullptr) {
                 if (auto produced = (*slot)(value, *reinterpret_cast<const cereal::SerializerContext *>(inert));
                     produced) {
-                    append(node, std::move(produced), std::move(name), depth + 1);
+                    append(node, std::move(produced), std::move(name), depth + 1, seen);
                     added = true;
                     continue;
                 }
             }
 
             const auto bound = descriptor->mDynamicSetterArgCtor(context->internal().mMetaCtx);
-            put(node, std::move(name), std::string{bound.info().name()});
+            put(node, std::move(name), std::string{bound.info().name()}, seen);
             added = true;
             continue;
         }
 #endif
 
-        append(node, data.get(value), std::move(name), depth + 1);
+        append(node, data.get(value), std::move(name), depth + 1, seen);
         added = true;
     }
 
     if (!added) {
         if (const auto getter = type.func(cereal::internal::kCustomGetter)) {
             if (auto payload = getter.invoke(value); payload) {
-                append_members(node, payload, depth + 1);
+                append_members(node, payload, depth + 1, seen);
             }
         }
     }
 }
 
-void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string name, const int depth)
+void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string name, const int depth,
+            KeyIndex *const seen)
 {
     if (!value) {
         return;
@@ -396,12 +411,12 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
     if (const auto *tag = value.try_cast<CompoundTag>();
         tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
         g_tag_nodes = 0;
-        append_tag(parent, *tag, Tag::Type::Compound, name, 0);
+        append_tag(parent, *tag, Tag::Type::Compound, name, 0, seen);
         return;
     }
 
     if (nlohmann::ordered_json scalar; value_of(scalar, value)) {
-        put(parent, std::move(name), std::move(scalar));
+        put(parent, std::move(name), std::move(scalar), seen);
         return;
     }
 
@@ -430,30 +445,30 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
             }
 
             if (count == 0) {
-                put(parent, std::move(name), text_or_bytes({}));
+                put(parent, std::move(name), text_or_bytes({}), seen);
             }
             else if (first != nullptr) {
                 put(parent, std::move(name),
-                    text_or_bytes(std::string_view{reinterpret_cast<const char *>(first), count}));
+                    text_or_bytes(std::string_view{reinterpret_cast<const char *>(first), count}), seen);
             }
             else {
-                put(parent, std::move(name), std::format("<{} bytes, layout not recognised>", count));
+                put(parent, std::move(name), std::format("<{} bytes, layout not recognised>", count), seen);
             }
             return;
         }
 
         auto node = nlohmann::ordered_json::array();
         for (auto &&element : elements) {
-            append(node, element.as_ref(), {}, depth + 1);
+            append(node, element.as_ref(), {}, depth + 1, nullptr);
         }
-        put(parent, std::move(name), std::move(node));
+        put(parent, std::move(name), std::move(node), seen);
         return;
     }
 
     if (type.is_associative_container()) {
         auto entries = value.as_associative_container();
         auto node = nlohmann::ordered_json::object();
-        std::unordered_set<std::string> keys;
+        KeyIndex keys;
         std::size_t index = 0;
         for (auto &&[key, mapped] : entries) {
             nlohmann::ordered_json named;
@@ -467,10 +482,10 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
             else {
                 text = named.dump();
             }
-            append(node, mapped.as_ref(), std::move(text), depth + 1);
+            append(node, mapped.as_ref(), std::move(text), depth + 1, &keys);
             ++index;
         }
-        put(parent, std::move(name), std::move(node));
+        put(parent, std::move(name), std::move(node), seen);
         return;
     }
 
@@ -479,10 +494,10 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
         const auto *bytes = bytes_of(value);
         if (bytes != nullptr && contained && contained.size_of() > 0 && contained.size_of() < type.size_of()) {
             if (bytes[contained.size_of()] == 0) {
-                put(parent, std::move(name), nullptr);
+                put(parent, std::move(name), nullptr, seen);
             }
             else {
-                append(parent, contained.from_void(bytes), std::move(name), depth + 1);
+                append(parent, contained.from_void(bytes), std::move(name), depth + 1, seen);
             }
             return;
         }
@@ -498,14 +513,14 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
                 const auto count = static_cast<std::size_t>(last - first) / element.size_of();
                 if (element.size_of() == 1 && !element.is_class() && !element.is_enum()) {
                     put(parent, std::move(name),
-                        text_or_bytes(std::string_view{reinterpret_cast<const char *>(first), count}));
+                        text_or_bytes(std::string_view{reinterpret_cast<const char *>(first), count}), seen);
                     return;
                 }
                 auto node = nlohmann::ordered_json::array();
                 for (std::size_t i = 0; i < count; ++i) {
-                    append(node, element.from_void(first + (i * element.size_of())), {}, depth + 1);
+                    append(node, element.from_void(first + (i * element.size_of())), {}, depth + 1, nullptr);
                 }
-                put(parent, std::move(name), std::move(node));
+                put(parent, std::move(name), std::move(node), seen);
                 return;
             }
         }
@@ -526,10 +541,11 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
             if (const auto alternative = index < arity ? type.template_arg(index) : entt::meta_type{}) {
                 auto active = alternative.from_void(bytes);
                 auto held = nlohmann::ordered_json::object();
-                append_members(held, active, depth + 1);
+                KeyIndex alternative_keys;
+                append_members(held, active, depth + 1, &alternative_keys);
                 auto node = nlohmann::ordered_json::object();
                 put(node, std::string{alternative.info().name()}, std::move(held));
-                put(parent, std::move(name), std::move(node));
+                put(parent, std::move(name), std::move(node), seen);
                 return;
             }
         }
@@ -537,10 +553,10 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
 
     if (type.is_pointer_like()) {
         if (auto pointed = *value; pointed) {
-            append(parent, std::move(pointed), std::move(name), depth + 1);
+            append(parent, std::move(pointed), std::move(name), depth + 1, seen);
         }
         else {
-            put(parent, std::move(name), nullptr);
+            put(parent, std::move(name), nullptr, seen);
         }
         return;
     }
@@ -551,7 +567,7 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
             continue;
         }
         if (auto serialized = func.invoke(value); serialized) {
-            append(parent, std::move(serialized), std::move(name), depth + 1);
+            append(parent, std::move(serialized), std::move(name), depth + 1, seen);
             return;
         }
     }
@@ -574,26 +590,30 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
                     if (inner.empty()) {
                         inner = std::string{only.name()};
                     }
-                    append(parent, std::move(wrapped), name.empty() ? std::move(inner) : std::move(name), depth + 1);
+                    append(parent, std::move(wrapped), name.empty() ? std::move(inner) : std::move(name), depth + 1,
+                           seen);
                     return;
                 }
             }
         }
 
         auto node = nlohmann::ordered_json::object();
-        append_members(node, value, depth);
+        KeyIndex keys;
+        append_members(node, value, depth, &keys);
         if (node.empty()) {
             put(parent, std::move(name),
-                std::format("<class '{}' id {:#x} size {}>", type.info().name(), type_key(type), type.size_of()));
+                std::format("<class '{}' id {:#x} size {}>", type.info().name(), type_key(type), type.size_of()),
+                seen);
             return;
         }
-        put(parent, std::move(name), std::move(node));
+        put(parent, std::move(name), std::move(node), seen);
         return;
     }
 
     put(parent, std::move(name),
         std::format("<'{}' id {:#x} size {}{}{}>", type.info().name(), type_key(type), type.size_of(),
-                    type.is_enum() ? " enum" : "", type.is_class() ? " class" : ""));
+                    type.is_enum() ? " enum" : "", type.is_class() ? " class" : ""),
+        seen);
 }
 
 bool holds_item(const entt::meta_type &type, std::unordered_set<entt::id_type> &seen, const int depth)
@@ -767,7 +787,8 @@ nlohmann::ordered_json decode_fields(Packet &packet, const int id)
         }
 
         auto root = nlohmann::ordered_json::object();
-        append_members(root, instance, 0);
+        KeyIndex keys;
+        append_members(root, instance, 0, &keys);
         if (root.empty()) {
             const auto type = entry->second;
             std::size_t bases = 0;
@@ -780,7 +801,8 @@ nlohmann::ordered_json decode_fields(Packet &packet, const int id)
             }
             put(root, "no fields",
                 std::format("types {} bases {} members {} getter {}", types.size(), bases, members,
-                            type.func(cereal::internal::kCustomGetter) ? "yes" : "no"));
+                            type.func(cereal::internal::kCustomGetter) ? "yes" : "no"),
+                &keys);
         }
         return root;
     }
