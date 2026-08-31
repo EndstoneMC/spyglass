@@ -107,7 +107,7 @@ void record_sent(const Packet &packet, const std::string_view written, const Sub
         .decoded = header.asExpected().has_value(),
         .unread = 0,
         .sub_id = static_cast<std::uint8_t>(recipient),
-        .fields = spyglass::decode_mode(packet.getName(), id) == spyglass::DecodeMode::Eager
+        .fields = spyglass::decode_mode(id) == spyglass::DecodeMode::Eager
                       ? spyglass::decode_fields(const_cast<Packet &>(packet), id)
                       : nlohmann::ordered_json{},
         .body = written.substr(std::min(stream.getReadPointer(), written.size())),
@@ -165,7 +165,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
             .decoded = broken.asExpected().has_value(),
             .unread = static_cast<std::uint32_t>(body.size() - truncated.getReadPointer()),
             .error = error_of(broken),
-            .fields = spyglass::decode_mode(getName(), id) == spyglass::DecodeMode::Eager
+            .fields = spyglass::decode_mode(id) == spyglass::DecodeMode::Eager
                           ? spyglass::decode_fields(*this, id)
                           : nlohmann::ordered_json{},
             .body = body,
@@ -182,7 +182,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
         .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
         .sub_id = static_cast<std::uint8_t>(sub_id),
         .error = error_of(result),
-        .fields = spyglass::decode_mode(getName(), id) == spyglass::DecodeMode::Eager
+        .fields = spyglass::decode_mode(id) == spyglass::DecodeMode::Eager
                       ? spyglass::decode_fields(*this, id)
                       : nlohmann::ordered_json{},
         .body = view.substr(std::min(begin, view.size())),

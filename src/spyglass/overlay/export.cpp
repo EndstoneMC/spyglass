@@ -286,7 +286,7 @@ void advance_export(ExportJob &job, const Capture &capture)
             }
 
             if (job.options.details && blob.fields.is_null() && blob.body &&
-                decode_mode(record.name, record.id) != DecodeMode::Eager) {
+                decode_mode(record.id) != DecodeMode::Eager) {
                 blob.fields =
                     decode_body(record.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()});
             }

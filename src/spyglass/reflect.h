@@ -15,7 +15,7 @@ enum class DecodeMode : std::int8_t {
     Eager = 2,
 };
 
-DecodeMode decode_mode(std::string_view name, int id);
+DecodeMode decode_mode(int id);
 
 bool has_fields(int id);
 

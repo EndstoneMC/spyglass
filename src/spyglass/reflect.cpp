@@ -707,20 +707,8 @@ const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ct
 
 }  // namespace
 
-DecodeMode decode_mode(const std::string_view name, const int id)
+DecodeMode decode_mode(const int id)
 {
-    constexpr std::array<std::string_view, 18> kItemPackets{
-        "AddActorPacket",          "AddItemActorPacket",      "AddPlayerPacket",
-        "CraftingDataPacket",      "CraftingEventPacket",     "CreativeContentPacket",
-        "InventoryContentPacket",  "InventorySlotPacket",     "InventoryTransactionPacket",
-        "ItemComponentPacket",     "ItemRegistryPacket",      "ItemStackRequestPacket",
-        "ItemStackResponsePacket", "MobArmorEquipmentPacket", "MobEquipmentPacket",
-        "PlayerAuthInputPacket",   "StartGamePacket",         "UpdateTradePacket",
-    };
-    if (std::ranges::find(kItemPackets, name) != kItemPackets.end()) {
-        return DecodeMode::Eager;
-    }
-
     static std::array<std::atomic<DecodeMode>, 1024> known{};
     if (id < 0 || id >= static_cast<int>(known.size())) {
         return DecodeMode::Lazy;
@@ -731,16 +719,20 @@ DecodeMode decode_mode(const std::string_view name, const int id)
         return seen;
     }
 
-    auto mode = DecodeMode::Lazy;
-    if (const auto *ctx = reflection_ctx(); ctx != nullptr) {
-        const auto &types = packet_types(ctx->internal().mMetaCtx);
-        if (const auto entry = types.find(id); entry != types.end()) {
-            std::unordered_set<entt::id_type> walked;
-            mode = holds_item(entry->second, walked, 0) ? DecodeMode::Eager : DecodeMode::Lazy;
-        }
+    const auto *ctx = reflection_ctx();
+    if (ctx == nullptr) {
+        return DecodeMode::Lazy;
     }
+    const auto &types = packet_types(ctx->internal().mMetaCtx);
+    const auto entry = types.find(id);
+    if (entry == types.end()) {
+        return DecodeMode::Lazy;
+    }
+
+    std::unordered_set<entt::id_type> walked;
+    const auto mode = holds_item(entry->second, walked, 0) ? DecodeMode::Eager : DecodeMode::Lazy;
     slot.store(mode, std::memory_order_relaxed);
-    return DecodeMode::Eager;
+    return mode;
 }
 
 bool has_fields(const int id)
@@ -755,14 +747,18 @@ bool has_fields(const int id)
         return seen == 2;
     }
 
-    auto any = false;
-    if (const auto *ctx = reflection_ctx(); ctx != nullptr) {
-        const auto &types = packet_types(ctx->internal().mMetaCtx);
-        if (const auto entry = types.find(id); entry != types.end()) {
-            std::unordered_set<entt::id_type> walked;
-            any = schema_members(entry->second, walked, 0);
-        }
+    const auto *ctx = reflection_ctx();
+    if (ctx == nullptr) {
+        return false;
     }
+    const auto &types = packet_types(ctx->internal().mMetaCtx);
+    const auto entry = types.find(id);
+    if (entry == types.end()) {
+        return false;
+    }
+
+    std::unordered_set<entt::id_type> walked;
+    const auto any = schema_members(entry->second, walked, 0);
     slot.store(any ? 2 : 1, std::memory_order_relaxed);
     return any;
 }
