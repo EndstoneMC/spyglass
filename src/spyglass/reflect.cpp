@@ -304,6 +304,12 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), key, depth + 1, &keys);
         }
+        if (node.empty()) {
+            if (auto summary = tag.toString(); summary != "{}") {
+                put(parent, std::string{name}, text_or_bytes(summary), seen);
+                return;
+            }
+        }
         put(parent, std::string{name}, std::move(node), seen);
         return;
     }
