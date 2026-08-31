@@ -89,3 +89,16 @@ private:
     std::size_t read_pointer_{0};  // +56 windows, +48 android
     bool has_overflowed_{false};   // +64 windows, +56 android
 };
+
+class BinaryStream : public ReadOnlyBinaryStream {
+public:
+    [[nodiscard]] std::string_view written() const
+    {
+        return buffer_ != nullptr ? std::string_view{*buffer_} : std::string_view{};
+    }
+
+private:
+    std::string *buffer_{nullptr};
+};
+
+static_assert(sizeof(BinaryStream) == sizeof(ReadOnlyBinaryStream) + sizeof(void *));

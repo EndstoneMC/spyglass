@@ -16,6 +16,7 @@
 #include "bedrock/network/minecraft_packets.h"
 #include <nlohmann/json.hpp>
 
+#include "bedrock/network/network_system.h"
 #include "bedrock/network/packet.h"
 #include "spyglass/detail.h"
 #include "spyglass/filename.h"
@@ -29,6 +30,7 @@ namespace {
 
 void *g_send_packet = nullptr;
 void *g_read_no_header = nullptr;
+void *g_network_system_send = nullptr;
 void *g_create_packet = nullptr;
 std::atomic<const cereal::ReflectionCtx *> g_reflection{nullptr};
 spyglass::Hooks g_hooks;
@@ -36,6 +38,7 @@ spyglass::Hooks g_hooks;
 constexpr bool kBreakFirstSubChunk = false;
 constexpr int kSubChunkPacket = 174;
 std::atomic_bool g_broke_one{false};
+std::atomic_bool g_rich_send{false};
 
 constexpr int kMaxErrorDepth = 16;
 
@@ -80,6 +83,35 @@ nlohmann::ordered_json error_of(const Bedrock::Result<void> &result)
 
 }  // namespace
 
+Bedrock::Result<void> read_packet_header(ReadOnlyBinaryStream &stream, int &id)
+{
+    const auto header = stream.getUnsignedVarInt();
+    id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1;
+    return {};
+}
+
+void NetworkSystem::send(const NetworkIdentifier &id, const Packet &packet, const SubClientId recipient)
+{
+    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::send, g_network_system_send, this, id, packet, recipient);
+
+    const auto written = sendStream().written();
+    ReadOnlyBinaryStream stream{written, false};
+    auto packet_id = -1;
+    read_packet_header(stream, packet_id);
+
+    spyglass::View::getInstance().onPacketSend({
+        .id = packet_id,
+        .name = packet.getName(),
+        .decoded = packet_id >= 0,
+        .unread = 0,
+        .sub_id = static_cast<std::uint8_t>(recipient),
+        .fields = spyglass::decode_mode(packet.getName(), packet_id) == spyglass::DecodeMode::Eager
+                      ? spyglass::decode_fields(const_cast<Packet &>(packet), packet_id)
+                      : nlohmann::ordered_json{},
+        .body = written.substr(std::min(stream.getReadPointer(), written.size())),
+    });
+}
+
 void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::Reliability reliability,
                                     const Compressibility compressible)
 {
@@ -87,12 +119,14 @@ void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::
     const auto header = stream.getUnsignedVarInt();
     const auto id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1;
 
-    spyglass::View::getInstance().onPacketSend({
-        .id = id,
-        .decoded = header.asExpected().has_value(),
-        .unread = header.asExpected().has_value() ? 0U : static_cast<std::uint32_t>(data.size()),
-        .body = std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size())),
-    });
+    if (!g_rich_send.load(std::memory_order_relaxed)) {
+        spyglass::View::getInstance().onPacketSend({
+            .id = id,
+            .decoded = header.asExpected().has_value(),
+            .unread = header.asExpected().has_value() ? 0U : static_cast<std::uint32_t>(data.size()),
+            .body = std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size())),
+        });
+    }
     SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::sendPacket, g_send_packet, this, data, reliability, compressible);
 }
 
@@ -156,6 +190,13 @@ void install_network_hook()
                              detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
     static FunctionHook read{"Packet::readNoHeader", g_hooks.read_no_header, detail::fp_cast(&Packet::readNoHeader),
                              &g_read_no_header};
+
+    if (!signature.network_system_send.empty()) {
+        g_hooks.network_system_send = find(signature.network_system_send);
+        static FunctionHook send_stream{"NetworkSystem::send", g_hooks.network_system_send,
+                                        detail::fp_cast(&NetworkSystem::send), &g_network_system_send};
+        g_rich_send.store(true, std::memory_order_relaxed);
+    }
 }
 
 const Hooks &hooks()

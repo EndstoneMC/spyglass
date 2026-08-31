@@ -19,6 +19,7 @@ namespace spyglass {
 struct Hooks {
     void *send_packet{nullptr};
     void *read_no_header{nullptr};
+    void *network_system_send{nullptr};
     void *create_packet{nullptr};
 };
 
