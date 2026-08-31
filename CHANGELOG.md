@@ -101,11 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   budget.
 - **BREAKING**: the retained packet and retained megabyte limits are gone, along with the settings
   for them. Nothing is dropped for age any more, so there is nothing to size.
-- Decoded fields are stored with the packet, so selecting a row shows them without waiting. A
-  received packet's fields are read out of the object the client itself decoded, which is the only
-  way to see what a packet that failed to read managed before it stopped. A sent packet has no such
-  object, so it is decoded from its bytes the first time it is opened, and the result is kept from
-  then on.
+- Fields are decoded from a packet's bytes the first time its row is opened, rather than for every
+  packet as it arrives, so the client's own thread no longer builds a tree for packets nobody looks
+  at. Packets carrying items are the exception: resolving an item needs the registry the client only
+  keeps while it is reading, so those are read out of the object the client itself decoded, which is
+  also the only way to see what a packet that failed to read managed before it stopped. Which
+  packets those are is worked out from the client's own schema, so it follows the client rather than
+  a list that goes stale.
 
 ### Fixed
 

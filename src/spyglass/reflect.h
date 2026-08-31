@@ -8,6 +8,8 @@ class Packet;
 
 namespace spyglass {
 
+bool needs_live_registry(int id);
+
 nlohmann::ordered_json decode_fields(Packet &packet, int id);
 nlohmann::ordered_json decode_body(int id, std::string_view body);
 
