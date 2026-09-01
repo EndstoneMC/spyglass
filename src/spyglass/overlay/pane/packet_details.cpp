@@ -39,7 +39,7 @@ void draw_node(const ViewOptions &options, std::string &text, const std::string_
     }
 
     text.clear();
-    field_line(text, key, value);
+    field_line(text, key, value, false);
 
     ImGui::PushID(index);
     if (!value.is_structured() || value.empty()) {

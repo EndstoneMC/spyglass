@@ -14,9 +14,8 @@
 namespace spyglass {
 namespace {
 
-constexpr std::size_t kMaxText = 96;
 constexpr std::size_t kMaxBytes = 16;
-constexpr std::size_t kPreviewChars = 24;
+constexpr std::size_t kPreviewChars = ((kMaxBytes + 2) / 3) * 4;
 constexpr int kDeepestNode = 64;
 constexpr std::string_view kWrapper = "atob(";
 
@@ -79,7 +78,8 @@ std::string report_csv(const Details &details)
                        format_bytes(body, 0, BytesFormat::Base64));
 }
 
-void field_line(std::string &out, const std::string_view key, const nlohmann::ordered_json &value)
+void field_line(std::string &out, const std::string_view key, const nlohmann::ordered_json &value,
+                const bool full)
 {
     out += key;
 
@@ -128,9 +128,9 @@ void field_line(std::string &out, const std::string_view key, const nlohmann::or
         std::format_to(std::back_inserter(out), "{} bytes:", total);
 
         static thread_local std::vector<std::uint8_t> preview;
-        const auto head = std::min<std::size_t>(encoded.size(), kPreviewChars);
+        const auto head = full ? encoded.size() : std::min<std::size_t>(encoded.size(), kPreviewChars);
         if (parse_base64(encoded.substr(0, head), preview)) {
-            const auto shown = std::min<std::size_t>(preview.size(), kMaxBytes);
+            const auto shown = full ? preview.size() : std::min<std::size_t>(preview.size(), kMaxBytes);
             for (std::size_t at = 0; at < shown; ++at) {
                 std::format_to(std::back_inserter(out), " {:02x}", preview[at]);
             }
@@ -142,18 +142,7 @@ void field_line(std::string &out, const std::string_view key, const nlohmann::or
     }
 
     out += '"';
-    std::size_t boundary = 0;
-    for (std::size_t at = 0; at < text.size() && boundary < kMaxText;) {
-        const auto byte = static_cast<unsigned char>(text[at]);
-        const auto width = byte < 0x80 ? 1 : byte < 0xE0 ? 2 : byte < 0xF0 ? 3 : 4;
-        if (at + width > text.size()) {
-            break;
-        }
-        at += width;
-        boundary = at;
-    }
-    for (std::size_t at = 0; at < boundary; ++at) {
-        const auto byte = text[at];
+    for (const auto byte : text) {
         if (byte == '\t') {
             out += "\\t";
         }
@@ -168,12 +157,9 @@ void field_line(std::string &out, const std::string_view key, const nlohmann::or
         }
     }
     out += '"';
-    if (boundary < text.size()) {
-        std::format_to(std::back_inserter(out), " ... ({} bytes)", text.size());
-    }
 }
 
-std::string report_node(const nlohmann::ordered_json &node, const int depth)
+std::string report_node(const nlohmann::ordered_json &node, const int depth, const bool full)
 {
     std::string text;
     if (depth > kDeepestNode) {
@@ -183,9 +169,9 @@ std::string report_node(const nlohmann::ordered_json &node, const int depth)
     if (node.is_object()) {
         for (const auto &[key, value] : node.items()) {
             std::format_to(std::back_inserter(text), "{:{}}", "", 2 * depth);
-            field_line(text, key, value);
+            field_line(text, key, value, full);
             text += '\n';
-            text += report_node(value, depth + 1);
+            text += report_node(value, depth + 1, full);
         }
         return text;
     }
@@ -193,9 +179,9 @@ std::string report_node(const nlohmann::ordered_json &node, const int depth)
         std::size_t index = 0;
         for (const auto &value : node) {
             std::format_to(std::back_inserter(text), "{:{}}", "", 2 * depth);
-            field_line(text, std::format("[{}]", index), value);
+            field_line(text, std::format("[{}]", index), value, full);
             text += '\n';
-            text += report_node(value, depth + 1);
+            text += report_node(value, depth + 1, full);
             ++index;
         }
     }

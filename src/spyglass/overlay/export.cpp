@@ -306,7 +306,7 @@ void advance_export(ExportJob &job, const Capture &capture)
                     chunk += report_details(details, job.options.bytes);
                     if (!blob.fields.is_null()) {
                         chunk += "  Fields\n";
-                        chunk += report_node(blob.fields, 2);
+                        chunk += report_node(blob.fields, 2, true);
                     }
                 }
                 else if (job.options.bytes) {
