@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <format>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -226,19 +227,19 @@ const Hooks &hooks()
 
 const std::vector<std::string> &packet_names()
 {
-    static const std::vector<std::string> names = [] {
-        std::vector<std::string> table(static_cast<std::size_t>(signatures().max_packet_id) + 1);
-        if (g_create_packet == nullptr) {
-            return table;
-        }
-        const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
-        for (std::size_t id = 1; id < table.size(); ++id) {
-            if (const auto packet = create(static_cast<MinecraftPacketIds>(id))) {
-                table[id] = packet->getName();
+    static std::vector<std::string> names;
+    static std::once_flag once;
+    if (g_create_packet != nullptr) {
+        std::call_once(once, [] {
+            names.resize(static_cast<std::size_t>(signatures().max_packet_id) + 1);
+            const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
+            for (std::size_t id = 1; id < names.size(); ++id) {
+                if (const auto packet = create(static_cast<MinecraftPacketIds>(id))) {
+                    names[id] = packet->getName();
+                }
             }
-        }
-        return table;
-    }();
+        });
+    }
     return names;
 }
 
