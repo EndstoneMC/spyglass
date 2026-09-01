@@ -317,15 +317,21 @@ void Store::restart()
 
 bool Store::push(Entry entry, std::vector<std::uint8_t> blob)
 {
-    const std::lock_guard lock{queue_mutex_};
-    if (!failure_.empty() || queue_.size() >= options_.queue_records ||
-        queued_bytes_ + blob.size() > options_.queue_bytes) {
-        dropped_.fetch_add(1, std::memory_order_relaxed);
-        return false;
+    bool idle = false;
+    {
+        const std::lock_guard lock{queue_mutex_};
+        if (!failure_.empty() || queue_.size() >= options_.queue_records ||
+            queued_bytes_ + blob.size() > options_.queue_bytes) {
+            dropped_.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
+        idle = queue_.empty();
+        queued_bytes_ += blob.size();
+        queue_.emplace_back(entry, std::move(blob));
     }
-    queued_bytes_ += blob.size();
-    queue_.emplace_back(entry, std::move(blob));
-    ready_.notify_one();
+    if (idle) {
+        ready_.notify_one();
+    }
     return true;
 }
 
