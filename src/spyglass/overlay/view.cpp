@@ -19,6 +19,7 @@
 #include "spyglass/overlay/pane/toolbar.h"
 #include "spyglass/overlay/theme.h"
 #include "spyglass/error.h"
+#include "spyglass/reflect.h"
 
 namespace spyglass {
 namespace {
@@ -43,6 +44,11 @@ View &View::getInstance()
 {
     static View view;
     return view;
+}
+
+bool View::wants_fields(const int id, const Direction direction) const
+{
+    return decode_mode(id) == DecodeMode::Eager && capture_.accepts(direction);
 }
 
 void View::onPacketSend(Incoming incoming)

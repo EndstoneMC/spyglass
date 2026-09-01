@@ -28,6 +28,7 @@ public:
 
     void onPacketSend(Incoming incoming);
     void onPacketReceive(Incoming incoming);
+    [[nodiscard]] bool wants_fields(int id, Direction direction) const;
 
     void toggle() noexcept { visible_ = !visible_; }
     [[nodiscard]] bool visible() const noexcept { return visible_; }

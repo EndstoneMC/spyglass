@@ -108,6 +108,7 @@ struct Statistics {
 class Capture {
 public:
     void record(Incoming incoming, Direction direction);
+    [[nodiscard]] bool accepts(Direction direction) const;
 
     template <typename Visitor> Visited visit(const std::uint64_t first, Visitor &&visitor) const
     {

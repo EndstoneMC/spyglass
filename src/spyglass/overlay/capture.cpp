@@ -38,6 +38,12 @@ Record Capture::record_of(const std::uint64_t number, const Entry &entry)
     };
 }
 
+bool Capture::accepts(const Direction direction) const
+{
+    const std::lock_guard lock{mutex_};
+    return running_ && (direction == Direction::Inbound || options_.outbound);
+}
+
 void Capture::record(Incoming incoming, const Direction direction)
 {
     {
