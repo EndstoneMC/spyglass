@@ -616,54 +616,6 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
         seen);
 }
 
-bool holds_item(const entt::meta_type &type, std::unordered_set<entt::id_type> &seen, const int depth)
-{
-    if (!type || depth > kDeepestType) {
-        return false;
-    }
-
-    const std::string_view name = type.info().name();
-    if (name.find("ItemStackDescriptor") != std::string_view::npos ||
-        name.find("ItemInstanceDescriptor") != std::string_view::npos ||
-        name.find("ItemDescriptor") != std::string_view::npos || name.find("ItemStack") != std::string_view::npos ||
-        name.find("ItemInstance") != std::string_view::npos) {
-        return true;
-    }
-    if (!seen.insert(type_key(type)).second) {
-        return false;
-    }
-
-    for (std::size_t at = 0; at < type.template_arity(); ++at) {
-        if (holds_item(type.template_arg(at), seen, depth + 1)) {
-            return true;
-        }
-    }
-    for (auto &&[base_id, base] : type.base()) {
-        if (holds_item(base.type(), seen, depth + 1)) {
-            return true;
-        }
-    }
-    for (auto &&[member_id, data] : type.data()) {
-        if (holds_item(data.type(), seen, depth + 1)) {
-            return true;
-        }
-#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
-        const cereal::internal::BasicSchema::MemberDescriptor *descriptor = data.custom();
-        const auto *context = reflection_ctx();
-        if (descriptor != nullptr && descriptor->mDynamicSetterArgCtor != nullptr && context != nullptr &&
-            holds_item(descriptor->mDynamicSetterArgCtor(context->internal().mMetaCtx), seen, depth + 1)) {
-            return true;
-        }
-#endif
-    }
-    for (auto &&[func_id, func] : type.func()) {
-        if (holds_item(func.ret(), seen, depth + 1)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool schema_members(const entt::meta_type &type, std::unordered_set<entt::id_type> &seen, const int depth)
 {
     if (!type || depth > kDeepestType || !seen.insert(type_key(type)).second) {
@@ -709,30 +661,18 @@ const std::unordered_map<int, entt::meta_type> &packet_types(const entt::meta_ct
 
 DecodeMode decode_mode(const int id)
 {
-    static std::array<std::atomic<DecodeMode>, 1024> known{};
-    if (id < 0 || id >= static_cast<int>(known.size())) {
-        return DecodeMode::Lazy;
-    }
+    static constexpr std::array kRegistryPackets{
+        MinecraftPacketIds::AddPlayer,        MinecraftPacketIds::AddItemActor,
+        MinecraftPacketIds::InventoryTransaction, MinecraftPacketIds::PlayerEquipment,
+        MinecraftPacketIds::MobArmorEquipment, MinecraftPacketIds::InventoryContent,
+        MinecraftPacketIds::InventorySlot,     MinecraftPacketIds::CraftingData,
+        MinecraftPacketIds::PlayerAuthInputPacket, MinecraftPacketIds::CreativeContent,
+        MinecraftPacketIds::ItemStackRequest,  MinecraftPacketIds::ItemRegistryPacket,
+    };
 
-    auto &slot = known[static_cast<std::size_t>(id)];
-    if (const auto seen = slot.load(std::memory_order_relaxed); seen != DecodeMode::Unknown) {
-        return seen;
-    }
-
-    const auto *ctx = reflection_ctx();
-    if (ctx == nullptr) {
-        return DecodeMode::Lazy;
-    }
-    const auto &types = packet_types(ctx->internal().mMetaCtx);
-    const auto entry = types.find(id);
-    if (entry == types.end()) {
-        return DecodeMode::Lazy;
-    }
-
-    std::unordered_set<entt::id_type> walked;
-    const auto mode = holds_item(entry->second, walked, 0) ? DecodeMode::Eager : DecodeMode::Lazy;
-    slot.store(mode, std::memory_order_relaxed);
-    return mode;
+    return std::ranges::find(kRegistryPackets, static_cast<MinecraftPacketIds>(id)) != kRegistryPackets.end()
+               ? DecodeMode::Eager
+               : DecodeMode::Lazy;
 }
 
 bool has_fields(const int id)
