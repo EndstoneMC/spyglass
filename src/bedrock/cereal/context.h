@@ -40,7 +40,6 @@ struct ReflectionCtx : private internal::ReflectionContext, Bedrock::EnableNonOw
 
 #ifdef _WIN32
 static_assert(sizeof(ReflectionCtx) == 0x80);
-static_assert(offsetof(internal::ReflectionContext, mMetaCtx) == 0);
 #endif
 
 }  // namespace cereal

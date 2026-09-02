@@ -3,7 +3,7 @@ project(spyglass VERSION 0.2.0 LANGUAGES CXX)
 
 if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-    set(default_clients "1.26.40.5;1.26.50.27-preview")
+    set(default_clients "1.26.40.5;1.26.50.27-preview;1.26.60.21-preview")
 elseif (ANDROID AND ANDROID_ABI STREQUAL "x86_64")
     set(default_clients "1.26.40.5")
 else ()

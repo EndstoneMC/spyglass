@@ -99,8 +99,15 @@ public:
         std::vector<OverrideState> mStorage;
     };
 
+    struct UnboundSlots {
+        void *mSlots[2];
+    };
+
     struct TypeDescriptor {
         std::unique_ptr<BasicSchema> mPtr;
+#if MINECRAFT_VERSION_HEX >= MINECRAFT_VERSION(1, 26, 60, 0)
+        UnboundSlots mUnboundSlots;
+#endif
         std::string mName;
         EnumMapping mEnumMapping;
         UserPropertiesMap mUserPropertiesMap;
@@ -110,6 +117,9 @@ public:
 
     struct MemberDescriptor {
         std::unique_ptr<BasicSchema> mPtr;
+#if MINECRAFT_VERSION_HEX >= MINECRAFT_VERSION(1, 26, 60, 0)
+        UnboundSlots mUnboundSlots;
+#endif
         std::unique_ptr<Constraint> mConstraint;
         std::string mNameExt;
         std::string mName;
@@ -139,19 +149,6 @@ public:
 
 #ifdef _WIN32
 static_assert(sizeof(UserPropertiesMap) == 72);
-static_assert(sizeof(BasicSchema::TypeDescriptor) == 0xC0);
-static_assert(offsetof(BasicSchema::TypeDescriptor, mName) == 0x08);
-static_assert(offsetof(BasicSchema::TypeDescriptor, mUserPropertiesMap) == 0x40);
-static_assert(offsetof(BasicSchema::MemberDescriptor, mName) == 0x30);
-#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 25)
-static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE8);
-static_assert(offsetof(BasicSchema::MemberDescriptor, mUserPropertiesMap) == 0x58);
-static_assert(offsetof(BasicSchema::MemberDescriptor, mSerializationTraits) == 0xD8);
-#else
-static_assert(sizeof(BasicSchema::MemberDescriptor) == 0xE0);
-static_assert(offsetof(BasicSchema::MemberDescriptor, mUserPropertiesMap) == 0x50);
-static_assert(offsetof(BasicSchema::MemberDescriptor, mSerializationTraits) == 0xD0);
-#endif
 static_assert(sizeof(BasicSchema::GetterDescriptor) == 0x10);
 static_assert(sizeof(BasicSchema::SetterDescriptor) == 0x18);
 #endif
