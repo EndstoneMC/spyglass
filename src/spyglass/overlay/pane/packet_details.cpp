@@ -117,7 +117,7 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             ImGui::TreePop();
         }
 
-        const auto bare = record->unread == 0 && !has_fields(record->id);
+        const auto bare = !details->error.is_null() || (record->unread == 0 && !has_fields(record->id));
 
         ImGui::PushID(static_cast<int>(record->number));
         set_open(options);

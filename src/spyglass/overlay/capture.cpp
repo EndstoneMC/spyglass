@@ -209,7 +209,7 @@ Fields Capture::fields(const std::uint64_t number)
 
     auto decoded = store_.fields(number, entry);
     if (decoded.is_null()) {
-        if (decode_mode(entry.id) == DecodeMode::Eager) {
+        if (decode_mode(entry.id) == DecodeMode::Eager || (entry.flags & kDecoded) == 0) {
             return {};
         }
         const auto blob = store_.read(entry);
