@@ -114,7 +114,7 @@ others.
 | `--dll <path>` | a payload of your choosing, instead of the one the version match would pick |
 | `--process <name>` | a client process other than `Minecraft.Windows.exe` |
 
-Press **Insert** in game for the overlay.
+Press **F12** in game for the overlay.
 
 The overlay stays out of the way of the game. It takes the mouse only while the game has let go of the cursor and
 the pointer is over the overlay, so an overlay left open during play is a picture and nothing more, and mouse-look
@@ -141,7 +141,7 @@ Write a `mod.json` beside it naming the mod:
 
 Then add that directory under `Mods` in the profile you play, and start the game.
 
-The overlay key is **F12** rather than Insert, since the launcher already takes Alt for its own menu bar.
+The overlay key is **F12**, the same as on Windows; the launcher already takes Alt for its own menu bar.
 
 ## Building from Source
 

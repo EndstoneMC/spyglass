@@ -291,11 +291,11 @@ void Overlay::present(IDXGISwapChain *swap_chain)
         return;
     }
 
-    const bool insert_down = GetForegroundWindow() == window_ && (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
-    if (insert_down && !insert_down_) {
+    const bool toggle_down = GetForegroundWindow() == window_ && (GetAsyncKeyState(VK_F12) & 0x8000) != 0;
+    if (toggle_down && !toggle_down_) {
         View::getInstance().toggle();
     }
-    insert_down_ = insert_down;
+    toggle_down_ = toggle_down;
 
     follow_window_dpi();
 

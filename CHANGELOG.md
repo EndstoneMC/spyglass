@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The overlay opens on **F12** on Windows, which is the key the Linux launcher build already used. It
+  was Insert.
+
 ## [0.3.0] - 2026-09-02
 
 ### Added

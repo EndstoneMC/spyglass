@@ -153,7 +153,7 @@ LRESULT InputHook::process(const HWND window, const UINT message, const WPARAM w
     case WM_KEYUP:
     case WM_SYSKEYUP: {
         const auto key = static_cast<std::size_t>(w_param) & 0xFFU;
-        if (key == VK_INSERT) {
+        if (key == VK_F12) {
             return 0;
         }
         const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;

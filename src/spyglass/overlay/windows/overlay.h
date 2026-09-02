@@ -45,7 +45,7 @@ private:
     float dpi_scale_{0.0F};
     bool context_ready_{false};
     bool unsupported_{false};
-    bool insert_down_{false};
+    bool toggle_down_{false};
 };
 
 }  // namespace spyglass
