@@ -105,8 +105,8 @@ needs them, and the elevated run carries on in a window of its own.
 
 The zip holds one DLL per client build. The injector reads the running client's version and whether it is the
 preview one, and loads the newest payload beside it that does not sit above that version, so
-`spyglass-0.2.0-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.2.0-1.26.50.preview.dll` serves
-the preview. A payload you built for some other version is picked up the same way if you drop it in beside the
+`spyglass-0.3.0-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.3.0-1.26.60.preview.dll` serves
+a 1.26.60 preview. A payload you built for some other version is picked up the same way if you drop it in beside the
 others.
 
 | option | |
@@ -130,7 +130,7 @@ object where the launcher looks. There is no injector to pick a payload for you,
 client your launcher runs:
 
 ```shell
-install -D libspyglass-0.2.0-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.2.0/x86_64/libspyglass.so
+install -D libspyglass-0.3.0-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.3.0/x86_64/libspyglass.so
 ```
 
 Write a `mod.json` beside it naming the mod:
@@ -183,7 +183,7 @@ preset for each platform and uploads what `cmake --install` stages.
 is what CI ships, and any four-component version works, with `-preview` on the ones that are:
 
 ```shell
-cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40.5;1.26.50.27-preview"
+cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40.5;1.26.60.21-preview"
 ```
 
 A version no pattern set covers fails the build rather than producing a payload that would not work.
@@ -192,16 +192,18 @@ A version no pattern set covers fails the build rather than producing a payload 
 
 | payload | client builds |
 | --- | --- |
-| `spyglass-0.2.0-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3 |
-| `spyglass-0.2.0-1.26.50.preview.dll` | Windows preview 1.26.50.27 |
-| `libspyglass-0.2.0-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
+| `spyglass-0.3.0-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3, 1.26.45.1 |
+| `spyglass-0.3.0-1.26.50.preview.dll` | Windows preview 1.26.50.27 |
+| `spyglass-0.3.0-1.26.60.preview.dll` | Windows preview 1.26.60.21 |
+| `libspyglass-0.3.0-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
 Release and preview are separate builds of the game, so a payload is built for one client line. On Windows the
 injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was not built for
 says so in the errors window and installs nothing.
 
 A payload is not tied to a single build, and in practice covers the builds of a line, but a client update can still
-need it refreshed. It will not guess: it says so in the errors window rather than act on something it is unsure of.
+need it refreshed. The two preview payloads are not interchangeable: 1.26.60 changed the reflection structures the
+field decoder reads out of the client, so each preview line has its own. It will not guess: it says so in the errors window rather than act on something it is unsure of.
 If the packet count stays at zero while you are connected, that window is where the reason is.
 
 ## Caveats

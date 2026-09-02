@@ -118,6 +118,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A packet carrying NBT no longer risks taking the client down. The 1.26.60 client allocates through
+  a different allocator than earlier builds do, and a tag was being read by asking the client to
+  format it, which handed spyglass a string it then returned to the wrong allocator. Tags are read
+  out of the client's own fields now, and captures are unchanged.
 - A hook that cannot be installed no longer stops the ones after it. The errors window names the
   one that failed and everything else still captures.
 - Keyboard navigation could move focus onto `Restart` and wipe the capture. The capture buttons no
