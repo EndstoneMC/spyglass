@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A payload for the 1.26.60 preview client, `spyglass-0.2.0-1.26.60.preview.dll`. `spyglass.exe` picks
+- A payload for the 1.26.60 preview client, `spyglass-0.3.0-1.26.60.preview.dll`. `spyglass.exe` picks
   it the way it picks the others, so nothing changes about how it is run.
 - Selecting a packet and expanding it shows the fields it decoded to. The names, values, enum names
   and nested structure come from the client's own cereal reflection, so they are whatever the client
@@ -96,8 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window reports the highest packet id the client knows and how many packet classes are hooked,
   both read out of the running client instead of compiled in.
 - **BREAKING**: a release now carries one payload per client build, named for the oldest client it
-  serves: `spyglass-0.2.0-1.26.40.dll` for the release client, `spyglass-0.2.0-1.26.50.preview.dll`
-  for the preview one, and `libspyglass-0.2.0-1.26.40.so` for the Linux launcher. There is no
+  serves: `spyglass-0.3.0-1.26.40.dll` for the release client, `spyglass-0.3.0-1.26.50.preview.dll`
+  for the preview one, and `libspyglass-0.3.0-1.26.40.so` for the Linux launcher. There is no
   `spyglass.dll` or `libspyglass.so` any more. On Windows `spyglass.exe` reads the running client's
   version and picks the payload for you, so nothing changes about how it is run; on Linux, install
   the shared object whose version matches the client your launcher runs. `--dll` still names a
