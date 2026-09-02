@@ -274,6 +274,36 @@ constexpr int kMaxTagNodes = 4096;
 
 thread_local int g_tag_nodes = 0;
 
+std::string_view tag_name(const Tag::Type type)
+{
+    switch (type) {
+    case Tag::Type::End:
+        return "TAG_End";
+    case Tag::Type::Byte:
+        return "TAG_Byte";
+    case Tag::Type::Short:
+        return "TAG_Short";
+    case Tag::Type::Int:
+        return "TAG_Int";
+    case Tag::Type::Int64:
+        return "TAG_Long";
+    case Tag::Type::Float:
+        return "TAG_Float";
+    case Tag::Type::Double:
+        return "TAG_Double";
+    case Tag::Type::ByteArray:
+        return "TAG_Byte_Array";
+    case Tag::Type::String:
+        return "TAG_String";
+    case Tag::Type::List:
+        return "TAG_List";
+    case Tag::Type::Compound:
+        return "TAG_Compound";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type type, const std::string_view name,
                 const int depth, KeyIndex *const seen = nullptr)
 {
@@ -312,7 +342,7 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
                 append_tag(node, *element, list.mType, {}, depth + 1);
             }
         }
-        put(parent, std::string{name}, std::move(node), seen);
+        put(parent, std::format("{}: {} ({})", name, tag_name(type), tag.toString()), std::move(node), seen);
         return;
     }
     case Tag::Type::Compound: {
@@ -322,13 +352,7 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), key, depth + 1, &keys);
         }
-        if (node.empty()) {
-            if (auto summary = tag.toString(); summary != "{}") {
-                put(parent, std::string{name}, text_or_bytes(summary), seen);
-                return;
-            }
-        }
-        put(parent, std::string{name}, std::move(node), seen);
+        put(parent, std::format("{}: {} ({})", name, tag_name(type), tag.toString()), std::move(node), seen);
         return;
     }
     default:
