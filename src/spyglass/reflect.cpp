@@ -32,6 +32,13 @@
 #include "bedrock/core/utility/binary_stream.h"
 #include "bedrock/nbt/byte_array_tag.h"
 #include "bedrock/nbt/byte_tag.h"
+#include "bedrock/nbt/double_tag.h"
+#include "bedrock/nbt/float_tag.h"
+#include "bedrock/nbt/int64_tag.h"
+#include "bedrock/nbt/int_array_tag.h"
+#include "bedrock/nbt/int_tag.h"
+#include "bedrock/nbt/short_tag.h"
+#include "bedrock/nbt/string_tag.h"
 #include "bedrock/nbt/compound_tag.h"
 #include "bedrock/nbt/list_tag.h"
 #include "bedrock/nbt/tag.h"
@@ -136,7 +143,7 @@ bool value_of(nlohmann::ordered_json &out, const entt::meta_any &value)
                           v->data[0] & 0xFFFF, v->data[1] >> 48, v->data[1] & 0xFFFF'FFFF'FFFF);
         return true;
     }
-    if (const auto *v = value.try_cast<CompoundTag>()) {
+    if (const auto *v = value.try_cast<const CompoundTag>()) {
         if (value.type().size_of() != sizeof(CompoundTag)) {
             out = "<compound tag, layout not recognised>";
             return true;
@@ -274,6 +281,38 @@ constexpr int kMaxTagNodes = 4096;
 
 thread_local int g_tag_nodes = 0;
 
+std::string_view tag_name(const Tag::Type type)
+{
+    switch (type) {
+    case Tag::Type::End:
+        return "TAG_End";
+    case Tag::Type::Byte:
+        return "TAG_Byte";
+    case Tag::Type::Short:
+        return "TAG_Short";
+    case Tag::Type::Int:
+        return "TAG_Int";
+    case Tag::Type::Int64:
+        return "TAG_Long";
+    case Tag::Type::Float:
+        return "TAG_Float";
+    case Tag::Type::Double:
+        return "TAG_Double";
+    case Tag::Type::ByteArray:
+        return "TAG_Byte_Array";
+    case Tag::Type::String:
+        return "TAG_String";
+    case Tag::Type::List:
+        return "TAG_List";
+    case Tag::Type::Compound:
+        return "TAG_Compound";
+    case Tag::Type::IntArray:
+        return "TAG_Int_Array";
+    default:
+        return "UNKNOWN";
+    }
+}
+
 void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type type, const std::string_view name,
                 const int depth, KeyIndex *const seen = nullptr)
 {
@@ -283,18 +322,40 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
 
     switch (type) {
     case Tag::Type::End:
-    case Tag::Type::Short:
-    case Tag::Type::Int:
-    case Tag::Type::Int64:
-    case Tag::Type::Float:
-    case Tag::Type::Double:
-    case Tag::Type::String:
-    case Tag::Type::IntArray:
-        put(parent, std::string{name}, tag.toString(), seen);
+        put(parent, std::string{name}, nlohmann::ordered_json{}, seen);
         return;
     case Tag::Type::Byte:
         put(parent, std::string{name}, static_cast<unsigned>(static_cast<const ByteTag &>(tag).data), seen);
         return;
+    case Tag::Type::Short:
+        put(parent, std::string{name}, static_cast<const ShortTag &>(tag).data, seen);
+        return;
+    case Tag::Type::Int:
+        put(parent, std::string{name}, static_cast<const IntTag &>(tag).data, seen);
+        return;
+    case Tag::Type::Int64:
+        put(parent, std::string{name}, static_cast<const Int64Tag &>(tag).data, seen);
+        return;
+    case Tag::Type::Float:
+        put(parent, std::string{name}, static_cast<const FloatTag &>(tag).data, seen);
+        return;
+    case Tag::Type::Double:
+        put(parent, std::string{name}, static_cast<const DoubleTag &>(tag).data, seen);
+        return;
+    case Tag::Type::String:
+        put(parent, std::string{name}, text_or_bytes(static_cast<const StringTag &>(tag).data), seen);
+        return;
+    case Tag::Type::IntArray: {
+        const auto &values = static_cast<const IntArrayTag &>(tag).mData;
+        auto node = nlohmann::ordered_json::array();
+        if (values.data() != nullptr) {
+            for (const auto value : values) {
+                node.push_back(value);
+            }
+        }
+        put(parent, std::string{name}, std::move(node), seen);
+        return;
+    }
     case Tag::Type::ByteArray: {
         const auto &data = static_cast<const ByteArrayTag &>(tag).mData;
         const auto *bytes = reinterpret_cast<const char *>(data.data());
@@ -312,7 +373,8 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
                 append_tag(node, *element, list.mType, {}, depth + 1);
             }
         }
-        put(parent, std::string{name}, std::move(node), seen);
+        put(parent, std::format("{}: {} ({} entries of type {})", name, tag_name(type), shown, tag_name(list.mType)),
+            std::move(node), seen);
         return;
     }
     case Tag::Type::Compound: {
@@ -322,13 +384,7 @@ void append_tag(nlohmann::ordered_json &parent, const Tag &tag, const Tag::Type 
         for (const auto &[key, value] : tags) {
             append_tag(node, *value, value.index(), key, depth + 1, &keys);
         }
-        if (node.empty()) {
-            if (auto summary = tag.toString(); summary != "{}") {
-                put(parent, std::string{name}, text_or_bytes(summary), seen);
-                return;
-            }
-        }
-        put(parent, std::string{name}, std::move(node), seen);
+        put(parent, std::format("{}: {} ({} entries)", name, tag_name(type), tags.size()), std::move(node), seen);
         return;
     }
     default:
@@ -408,7 +464,7 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
         return;
     }
 
-    if (const auto *tag = value.try_cast<CompoundTag>();
+    if (const auto *tag = value.try_cast<const CompoundTag>();
         tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
         g_tag_nodes = 0;
         append_tag(parent, *tag, Tag::Type::Compound, name, 0, seen);
