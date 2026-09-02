@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,12 +17,11 @@ struct ReflectionCtx;
 
 namespace spyglass {
 
+inline constexpr std::size_t kPacketIdLimit = 512;
+
 struct Hooks {
-    void *send_packet{nullptr};
-    void *read_no_header{nullptr};
-    void *network_system_send{nullptr};
-    void *network_system_send_multiple{nullptr};
     void *create_packet{nullptr};
+    std::size_t packet_classes{0};
 };
 
 void install_network_hook();

@@ -10,29 +10,24 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "bedrock/core/utility/binary_stream.h"
-#include "bedrock/network/batched_network_peer.h"
 #include "bedrock/network/minecraft_packets.h"
 #include <nlohmann/json.hpp>
 
-#include "bedrock/network/network_system.h"
 #include "bedrock/network/packet.h"
 #include "spyglass/detail.h"
+#include "spyglass/error.h"
 #include "spyglass/filename.h"
 #include "spyglass/hook.h"
 #include "spyglass/overlay/view.h"
-#include "spyglass/pattern.h"
 #include "spyglass/reflect.h"
 #include "spyglass/signature.h"
 
 namespace {
 
-void *g_send_packet = nullptr;
-void *g_read_no_header = nullptr;
-void *g_network_system_send = nullptr;
-void *g_network_system_send_multiple = nullptr;
 void *g_create_packet = nullptr;
 std::atomic<const cereal::ReflectionCtx *> g_reflection{nullptr};
 spyglass::Hooks g_hooks;
@@ -40,7 +35,24 @@ spyglass::Hooks g_hooks;
 constexpr bool kBreakFirstSubChunk = false;
 constexpr int kSubChunkPacket = 174;
 std::atomic_bool g_broke_one{false};
-std::atomic_bool g_rich_send{false};
+
+// MSVC reverses the read overload pair and Itanium spends a second slot on the destructor, which
+// cancel; the write is a lone virtual, so it lands one slot later on Itanium
+#ifdef _WIN32
+constexpr std::size_t kPacketWriteSlot = 5;
+#else
+constexpr std::size_t kPacketWriteSlot = 6;
+#endif
+constexpr std::size_t kPacketReadSlot = 9;
+
+constexpr auto kPacketRead = &Packet::readDetour;
+constexpr auto kPacketWrite = &Packet::writeDetour;
+
+void *original_of(const Packet &packet, const std::size_t ordinal)
+{
+    auto **vtable = *reinterpret_cast<void ***>(const_cast<Packet *>(&packet));
+    return spyglass::vfunc_original(vtable, ordinal);
+}
 
 constexpr int kMaxErrorDepth = 16;
 
@@ -92,64 +104,37 @@ Bedrock::Result<void> read_packet_header(ReadOnlyBinaryStream &stream, int &id)
     return {};
 }
 
-void record_sent(const Packet &packet, const std::string_view written, const SubClientId recipient)
+void record_sent(const Packet &packet, const std::string_view body)
 {
-    if (!g_rich_send.load(std::memory_order_relaxed)) {
-        return;
-    }
-
-    ReadOnlyBinaryStream stream{written, false};
-    const auto header = stream.getUnsignedVarInt();
-    const auto id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1;
-
+    const auto id = static_cast<int>(packet.getId());
     auto &overlay = spyglass::View::getInstance();
     overlay.onPacketSend({
         .id = id,
         .name = packet.getName(),
-        .decoded = header.asExpected().has_value(),
+        .decoded = true,
         .unread = 0,
-        .sub_id = static_cast<std::uint8_t>(recipient),
+        .sub_id = static_cast<std::uint8_t>(packet.getSenderSubId()),
         .fields = overlay.wants_fields(id, spyglass::Direction::Outbound)
                       ? spyglass::decode_fields(const_cast<Packet &>(packet), id)
                       : nlohmann::ordered_json{},
-        .body = written.substr(std::min(stream.getReadPointer(), written.size())),
+        .body = body,
     });
 }
 
-void NetworkSystem::send(const NetworkIdentifier &id, const Packet &packet, const SubClientId recipient)
+void Packet::writeDetour(BinaryStream &stream, const cereal::ReflectionCtx &reflection_ctx,
+                         const std::optional<SerializationMode> override_mode) const
 {
-    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::send, g_network_system_send, this, id, packet, recipient);
-    record_sent(packet, sendStream().written(), recipient);
+    const auto begin = stream.written().size();
+    SPYGLASS_CALL_ORIGINAL(kPacketWrite, original_of(*this, kPacketWriteSlot), this, stream, reflection_ctx,
+                           override_mode);
+    const auto written = stream.written();
+    record_sent(*this, written.substr(std::min(begin, written.size())));
 }
 
-void NetworkSystem::sendToMultiple(const std::vector<NetworkIdentifierWithSubId> &ids, const Packet &packet)
-{
-    SPYGLASS_CALL_ORIGINAL(&NetworkSystem::sendToMultiple, g_network_system_send_multiple, this, ids, packet);
-    record_sent(packet, sendStream().written(), SubClientId::PrimaryClient);
-}
-
-void BatchedNetworkPeer::sendPacket(const std::string &data, const NetworkPeer::Reliability reliability,
-                                    const Compressibility compressible)
-{
-    ReadOnlyBinaryStream stream{data, false};
-    const auto header = stream.getUnsignedVarInt();
-    const auto id = header.asExpected().has_value() ? static_cast<int>(header.asExpected().value() & 0x3FF) : -1;
-
-    if (!g_rich_send.load(std::memory_order_relaxed)) {
-        spyglass::View::getInstance().onPacketSend({
-            .id = id,
-            .decoded = header.asExpected().has_value(),
-            .unread = header.asExpected().has_value() ? 0U : static_cast<std::uint32_t>(data.size()),
-            .body = std::string_view{data}.substr(std::min(stream.getReadPointer(), data.size())),
-        });
-    }
-    SPYGLASS_CALL_ORIGINAL(&BatchedNetworkPeer::sendPacket, g_send_packet, this, data, reliability, compressible);
-}
-
-Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &reflection_ctx,
-                                           const SubClientId &sub_id)
+Bedrock::Result<void> Packet::readDetour(ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &reflection_ctx)
 {
     g_reflection.store(&reflection_ctx, std::memory_order_relaxed);
+    auto *const original = original_of(*this, kPacketReadSlot);
     const auto begin = stream.getReadPointer();
     const auto view = stream.getView();
 
@@ -158,8 +143,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
     if (kBreakFirstSubChunk && id == kSubChunkPacket && !g_broke_one.exchange(true)) {
         const auto body = view.substr(std::min(begin, view.size()));
         ReadOnlyBinaryStream truncated{body.substr(0, body.size() / 2), true};
-        auto broken =
-            SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, this, truncated, reflection_ctx, sub_id);
+        auto broken = SPYGLASS_CALL_ORIGINAL(kPacketRead, original, this, truncated, reflection_ctx);
         stream.setReadPointer(view.size());
         auto &overlay = spyglass::View::getInstance();
         overlay.onPacketReceive({
@@ -176,7 +160,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
         return broken;
     }
 
-    auto result = SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, this, stream, reflection_ctx, sub_id);
+    auto result = SPYGLASS_CALL_ORIGINAL(kPacketRead, original, this, stream, reflection_ctx);
 
     auto &overlay = spyglass::View::getInstance();
     overlay.onPacketReceive({
@@ -184,7 +168,7 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
         .name = getName(),
         .decoded = result.asExpected().has_value(),
         .unread = static_cast<std::uint32_t>(stream.getUnreadLength()),
-        .sub_id = static_cast<std::uint8_t>(sub_id),
+        .sub_id = static_cast<std::uint8_t>(getSenderSubId()),
         .error = error_of(result),
         .fields = overlay.wants_fields(id, spyglass::Direction::Inbound)
                       ? spyglass::decode_fields(*this, id)
@@ -195,28 +179,47 @@ Bedrock::Result<void> Packet::readNoHeader(ReadOnlyBinaryStream &stream, const c
 }
 
 namespace spyglass {
+namespace {
+
+void hook_packet_classes()
+{
+    std::unordered_set<void **> seen;
+    std::size_t classes = 0;
+    for (std::size_t id = 1; id < kPacketIdLimit; ++id) {
+        const auto packet = create_packet(static_cast<int>(id));
+        if (!packet) {
+            continue;
+        }
+        auto **vtable = *reinterpret_cast<void ***>(packet.get());
+        if (!seen.insert(vtable).second) {
+            continue;
+        }
+        if (static_cast<std::size_t>(packet->getId()) != id) {
+            report_error(std::format("Packet::read: id {} reports itself as {}, refusing to hook a vtable that does "
+                                     "not match the mirror",
+                                     id, static_cast<int>(packet->getId())));
+            return;
+        }
+        if (swap_vfunc("Packet::writeWithSerializationMode", vtable, kPacketWriteSlot,
+                       detail::fp_cast(kPacketWrite)) &&
+            swap_vfunc("Packet::read", vtable, kPacketReadSlot, detail::fp_cast(kPacketRead))) {
+            ++classes;
+        }
+    }
+    g_hooks.packet_classes = classes;
+}
+
+}  // namespace
 
 void install_network_hook()
 {
     verify_client();
     const auto &signature = signatures();
-    g_create_packet = find(signature.create_packet);
-    g_hooks.create_packet = g_create_packet;
-    g_hooks.send_packet = find(signature.batched_send_packet);
-    g_hooks.read_no_header = find(signature.packet_read_no_header);
-    static FunctionHook send{"BatchedNetworkPeer::sendPacket", g_hooks.send_packet,
-                             detail::fp_cast(&BatchedNetworkPeer::sendPacket), &g_send_packet};
-    static FunctionHook read{"Packet::readNoHeader", g_hooks.read_no_header, detail::fp_cast(&Packet::readNoHeader),
-                             &g_read_no_header};
 
-    if (!signature.network_system_send.empty() && !signature.network_system_send_multiple.empty()) {
-        g_hooks.network_system_send = find(signature.network_system_send);
-        g_hooks.network_system_send_multiple = find(signature.network_system_send_multiple);
-        static FunctionHook sent{"NetworkSystem::send", g_hooks.network_system_send,
-                                 detail::fp_cast(&NetworkSystem::send), &g_network_system_send};
-        static FunctionHook sent_many{"NetworkSystem::sendToMultiple", g_hooks.network_system_send_multiple,
-                                      detail::fp_cast(&NetworkSystem::sendToMultiple), &g_network_system_send_multiple};
-        g_rich_send.store(true, std::memory_order_relaxed);
+    g_create_packet = locate("MinecraftPackets::createPacket", signature.create_packet);
+    g_hooks.create_packet = g_create_packet;
+    if (g_create_packet != nullptr) {
+        hook_packet_classes();
     }
 }
 
@@ -231,13 +234,16 @@ const std::vector<std::string> &packet_names()
     static std::once_flag once;
     if (g_create_packet != nullptr) {
         std::call_once(once, [] {
-            names.resize(static_cast<std::size_t>(signatures().max_packet_id) + 1);
+            names.resize(kPacketIdLimit);
             const auto create = reinterpret_cast<decltype(&MinecraftPackets::createPacket)>(g_create_packet);
+            std::size_t highest = 0;
             for (std::size_t id = 1; id < names.size(); ++id) {
                 if (const auto packet = create(static_cast<MinecraftPacketIds>(id))) {
                     names[id] = packet->getName();
+                    highest = id;
                 }
             }
+            names.resize(highest + 1);
         });
     }
     return names;
@@ -260,7 +266,12 @@ std::shared_ptr<Packet> create_packet(const int id)
 Bedrock::Result<void> read_no_header(Packet &packet, ReadOnlyBinaryStream &stream, const cereal::ReflectionCtx &ctx,
                                      const SubClientId sub_id)
 {
-    return SPYGLASS_CALL_ORIGINAL(&Packet::readNoHeader, g_read_no_header, &packet, stream, ctx, sub_id);
+    auto *const original = original_of(packet, kPacketReadSlot);
+    if (original == nullptr) {
+        return {};
+    }
+    packet.setSenderSubId(sub_id);
+    return SPYGLASS_CALL_ORIGINAL(kPacketRead, original, &packet, stream, ctx);
 }
 
 }  // namespace spyglass

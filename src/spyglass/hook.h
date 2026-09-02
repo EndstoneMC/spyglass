@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string_view>
 #include <utility>
@@ -35,6 +36,43 @@ private:
 
     funchook_t *funchook_{nullptr};
 };
+
+class VtableSwap {
+public:
+    VtableSwap(std::string_view name, void **slot, void *detour);
+    ~VtableSwap();
+
+    VtableSwap(VtableSwap &&other) noexcept
+        : slot_{std::exchange(other.slot_, nullptr)}, original_{other.original_}
+    {
+    }
+
+    VtableSwap &operator=(VtableSwap &&other) noexcept
+    {
+        if (this != &other) {
+            slot_ = std::exchange(other.slot_, nullptr);
+            original_ = other.original_;
+        }
+        return *this;
+    }
+
+    VtableSwap(const VtableSwap &) = delete;
+    VtableSwap &operator=(const VtableSwap &) = delete;
+
+    [[nodiscard]] void *original() const { return original_; }
+
+private:
+    void **slot_{nullptr};
+    void *original_{nullptr};
+};
+
+void *locate(std::string_view name, std::string_view pattern);
+
+void *install_hook(std::string_view name, std::string_view pattern, void *detour, void **original);
+
+bool swap_vfunc(std::string_view name, void **vtable, std::size_t ordinal, void *detour);
+
+void *vfunc_original(void **vtable, std::size_t ordinal);
 
 }  // namespace spyglass
 

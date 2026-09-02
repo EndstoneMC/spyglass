@@ -31,7 +31,6 @@
 class AppPlatform;
 class NetEventCallback;
 class NetworkStatistics;
-struct NetworkIdentifierWithSubId;
 class Packet;
 class Scheduler;
 class TaskGroup;
@@ -73,20 +72,9 @@ class NetworkSystem : public RakNetConnector::ConnectionCallbacks,
                       public RakPeerHelper::IPSupportInterface,
                       public NetworkEnableDisableListener {
 public:
-    void send(const NetworkIdentifier &id, const Packet &packet, SubClientId recipient);
-    void sendToMultiple(const std::vector<NetworkIdentifierWithSubId> &ids, const Packet &packet);
     bool onNewIncomingConnection(const NetworkIdentifier &id, std::shared_ptr<NetworkPeer> &&peer);
     bool onNewOutgoingConnection(const NetworkIdentifier &id, std::shared_ptr<NetworkPeer> &&peer);
     [[nodiscard]] NetworkConnection *_getConnectionFromId(const NetworkIdentifier &id) const;
-
-    [[nodiscard]] const BinaryStream &sendStream() const
-    {
-#ifdef _WIN32
-        static_assert(offsetof(NetworkSystem, send_stream_) == 0x168);
-        static_assert(offsetof(NetworkSystem, reflection_ctx_) == 0x208);
-#endif
-        return send_stream_;
-    }
 
 private:
     struct IncomingPacketQueue {

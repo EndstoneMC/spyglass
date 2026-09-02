@@ -373,18 +373,18 @@ void draw_about_window(bool &open)
         ImGui::Separator();
         const auto &signature = signatures();
         ImGui::Text("Client: %.*s", static_cast<int>(signature.name.size()), signature.name.data());
-        ImGui::Text("Highest packet id: %d", signature.max_packet_id);
+        const auto &names = packet_names();
+        ImGui::Text("Highest packet id: %zu", names.empty() ? 0 : names.size() - 1);
         std::size_t named = 0;
-        for (const auto &name : packet_names()) {
+        for (const auto &name : names) {
             named += name.empty() ? 0 : 1;
         }
         ImGui::Text("Packets named: %zu", named);
 
         ImGui::Separator();
         const auto &hooked = hooks();
-        ImGui::Text("BatchedNetworkPeer::sendPacket   %p", hooked.send_packet);
-        ImGui::Text("Packet::readNoHeader             %p", hooked.read_no_header);
         ImGui::Text("MinecraftPackets::createPacket   %p", hooked.create_packet);
+        ImGui::Text("Packet::read and write           %zu classes", hooked.packet_classes);
     }
     ImGui::End();
 }

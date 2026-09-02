@@ -122,8 +122,7 @@ nlohmann::ordered_json take_document(std::string_view &in)
 
 std::vector<std::atomic<const std::string *>> &fallback_names()
 {
-    static std::vector<std::atomic<const std::string *>> table(static_cast<std::size_t>(signatures().max_packet_id) +
-                                                               1);
+    static std::vector<std::atomic<const std::string *>> table(kPacketIdLimit);
     return table;
 }
 

@@ -83,6 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Packets are captured off the packet itself rather than off the two functions earlier payloads
+  hooked, so a client update that inlines or moves either of them no longer costs a capture. Sends
+  on the Linux launcher now carry their decoded fields, which they never did before, and the about
+  window reports the highest packet id the client knows and how many packet classes are hooked,
+  both read out of the running client instead of compiled in.
 - **BREAKING**: a release now carries one payload per client build, named for the oldest client it
   serves: `spyglass-0.2.0-1.26.40.dll` for the release client, `spyglass-0.2.0-1.26.50.preview.dll`
   for the preview one, and `libspyglass-0.2.0-1.26.40.so` for the Linux launcher. There is no
@@ -113,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A hook that cannot be installed no longer stops the ones after it. The errors window names the
+  one that failed and everything else still captures.
 - Keyboard navigation could move focus onto `Restart` and wipe the capture. The capture buttons no
   longer take focus.
 - The expert information window and the status bar walked the whole capture every frame. They now

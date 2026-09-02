@@ -8,7 +8,6 @@
 #include "spyglass/detail.h"
 #include "spyglass/hook.h"
 #include "spyglass/overlay/windows/overlay.h"
-#include "spyglass/pattern.h"
 #include "spyglass/signature.h"
 
 namespace {
@@ -31,7 +30,7 @@ namespace spyglass {
 
 void install_mouse_hook()
 {
-    static FunctionHook feed{"MouseDevice::feed", find(kMouseFeed), detail::fp_cast(&MouseDevice::feed), &g_feed};
+    install_hook("MouseDevice::feed", kMouseFeed, detail::fp_cast(&MouseDevice::feed), &g_feed);
 }
 
 }  // namespace spyglass
