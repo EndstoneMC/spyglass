@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(spyglass VERSION 0.3.0 LANGUAGES CXX)
+project(spyglass VERSION 0.3.1 LANGUAGES CXX)
 
 if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)

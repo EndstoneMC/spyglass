@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-02
+
 ### Changed
 
 - The overlay opens on **F12** on Windows, which is the key the Linux launcher build already used. It
@@ -199,7 +201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An injector that asks for elevation itself and grants the payload the rights a packaged app
   needs before loading it into the client.
 
-[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/EndstoneMC/spyglass/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/EndstoneMC/spyglass/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/EndstoneMC/spyglass/releases/tag/v0.2.0
 [0.1.0]: https://github.com/EndstoneMC/spyglass/releases/tag/v0.1.0
