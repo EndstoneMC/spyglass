@@ -19,57 +19,46 @@
 
 ## What you get
 
-**The list** is every packet of the session, oldest first, with the direction, the packet id, the length and the
-name. It follows the tail until you scroll away from it, and picking a row holds it. Packets that failed to decode
-are coloured.
+**List** — every packet of the session, oldest first: direction, id, length, name. Follows the tail until you scroll
+away from it. Failed decodes are coloured.
 
-**The details** pane breaks the selected packet down: the frame, the packet, and the fields it decoded to, with
-names, values, enum names and nested structure taken from the client's own cereal reflection. A field holding NBT
-opens as a tree of the tag itself. When the decode failed, the pane carries the error the client raised, the fields
-it managed before it stopped, and the Bedrock call stack under it, down to source file and line.
+**Details** — the frame, the packet, and the fields it decoded to, with names, values, enum names and nesting from
+the client's own cereal reflection. A field holding NBT opens as a tag tree. On a failure, the error the client
+raised, the fields it managed before it stopped, and the Bedrock call stack under it, down to file and line.
 
-**The bytes** pane is the body as one hex run, with the part the decode never reached tinted. You can select a range
-by click, drag and shift-click in either half, search the body for hex or text with `F3` and `Ctrl+F`, and copy what
-you have selected as a hex dump, a hex stream, printable text, a C array or base64. `Show text...` puts the same
-output in a box to read instead of on the clipboard.
+**Bytes** — the body as one hex run, with the part the decode never reached tinted. Select a range by click, drag
+and shift-click in either half, search it for hex or text with `Ctrl+F` and `F3`, and copy as a hex dump, a hex
+stream, printable text, a C array or base64. `Show text...` puts the same output in a box instead of on the
+clipboard.
 
-**The filter** window, opened with `Filter` on the toolbar, decides what the list shows. It holds every packet the
-client knows, by id, each with a tick box and the number of them the session has seen. The find box narrows the
-window's own list, and `All`, `None` and `Invert` act on what it is showing. `Failed decodes only` and the two
-direction boxes cut the list down further, and right-clicking a packet in the capture hides it or shows only it. The
-button carries a mark while a filter is on, and the status bar says how many packets are being shown.
+**Filter**, on the toolbar — every packet the client knows, by id, each with a tick box and a seen count. A find box
+that `All`, `None` and `Invert` act through, `Failed decodes only`, and a box per direction. Right-clicking a packet
+in the list hides it or shows only it. The button carries a mark while a filter is on.
 
-`Start`, `Stop` and `Restart` control the capture. The status bar carries the totals, the share that failed, and the
-extent of the selection.
+**Capture** — `Start`, `Stop` and `Restart`. Sent packets as well as received ones, no length limit, and temporary:
+it goes when the client does, and one left behind by a crashed client is cleaned up on the next inject. `Capture ▸
+Options` sets the memory it may use and turns off capturing sent packets. The status bar carries the totals, the
+share that failed, the extent of the selection, how many packets are shown, the size of the capture, and how many
+packets were dropped rather than allowed to hold the game up.
 
-**The menu bar** above them holds the rest. Nothing is bound to a key: every action is a menu item, or an entry on
-the right-click menu of the row it applies to.
+**Menus**, with nothing bound to a key:
 
-`Go` jumps the list to a packet by number, the first or last, the next failed decode, the next packet of the same
-kind as the selected one, or back and forward through the packets you have looked at. `Edit` finds a packet by name,
-by id, or by hex or text in its body, marks packets so they keep their place, makes any packet the zero of the
-clock, and copies the selected row, the details tree, or every displayed row as text or CSV. `View` hides panes,
-zooms, expands the details tree, turns the colouring of failed packets off, resizes the columns to their contents,
-opens a packet in a window of its own, and chooses what the `Time` column means: seconds since the first packet,
-since the previous captured packet, since the previous displayed packet, or the time of day.
-
-`Analyze` opens the expert information window, which groups every failed decode by the reason the client gave and
-the packet it was reading, and jumps to one when you click it. It also reads the selected bytes out as an integer, a
-float, a varint and text. `Statistics` reports what the session captured, a breakdown per packet id with its share
-of the bytes, the distribution of packet lengths, and a graph of packets or bytes per second.
-
-Sent packets are captured as well as received ones. The capture has no length limit, and it is temporary: it goes
-when the client does, and one left behind by a client that crashed is cleaned up on the next inject. `Capture ▸
-Options` sets the memory it may use, and turns off capturing sent packets. Packets are dropped rather than allowed
-to hold the game up, and the status bar counts them when it happens, next to the size of the capture.
-
-`File` writes the capture out. `Export Packets...` takes the packets as text, CSV or JSON, and asks which ones: all
-of them, the selected one, the marked ones, or a range you write out, against either everything captured or only
-what the filter is showing. It also asks how much of each packet to write: the summary line, the details tree, the
-bytes, or any combination. It counts what each choice selects and estimates the size before you commit to it, and a
-long export shows its progress and can be cancelled, without stopping the game.
-`Export Selected Packet Bytes...` writes the range selected in the bytes pane as a raw file with nothing added, and
-the whole body when nothing is selected. `Export Session Summary...` writes the totals.
+- `Go` — a packet by number, the first or last, the next failed decode, the next of the same kind, and back and
+  forward through the ones you have looked at.
+- `Edit` — find by name, by id, or by hex or text in the body; mark packets; set the zero of the clock; copy the
+  row, the details tree, or every displayed row as text or CSV.
+- `View` — hide panes, zoom, expand the tree, turn the colouring off, fit the columns, open a packet in its own
+  window, and set what `Time` means: since the first packet, the previous captured one, the previous displayed one,
+  or the time of day.
+- `Analyze` — failed decodes grouped by the reason the client gave and the packet it was reading, click to jump; and
+  the selected bytes read out as an integer, a float, a varint and text.
+- `Statistics` — what the session captured, a per-id breakdown with its share of the bytes, the distribution of
+  packet lengths, and a graph of packets or bytes per second.
+- `File` — `Export Packets...` as text, CSV or JSON: all of them, the selected one, the marked ones or a range,
+  against everything captured or only what the filter shows, with the summary line, the details tree and the bytes
+  in any combination. It counts and estimates the size first, then runs behind a progress bar you can cancel,
+  without stopping the game. `Export Selected Packet Bytes...` writes the selected range raw, the whole body when
+  nothing is selected. `Export Session Summary...` writes the totals.
 
 The save dialog starts in `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher, lists the
 directory it is in, takes a path typed in full, and says so before it overwrites a file.
