@@ -136,7 +136,7 @@ bool value_of(nlohmann::ordered_json &out, const entt::meta_any &value)
                           v->data[0] & 0xFFFF, v->data[1] >> 48, v->data[1] & 0xFFFF'FFFF'FFFF);
         return true;
     }
-    if (const auto *v = value.try_cast<CompoundTag>()) {
+    if (const auto *v = value.try_cast<const CompoundTag>()) {
         if (value.type().size_of() != sizeof(CompoundTag)) {
             out = "<compound tag, layout not recognised>";
             return true;
@@ -408,7 +408,7 @@ void append(nlohmann::ordered_json &parent, entt::meta_any value, std::string na
         return;
     }
 
-    if (const auto *tag = value.try_cast<CompoundTag>();
+    if (const auto *tag = value.try_cast<const CompoundTag>();
         tag != nullptr && value.type().size_of() == sizeof(CompoundTag)) {
         g_tag_nodes = 0;
         append_tag(parent, *tag, Tag::Type::Compound, name, 0, seen);
