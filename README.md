@@ -26,6 +26,10 @@ away from it. Failed decodes are coloured.
 the client's own cereal reflection. A field holding NBT opens as a tag tree. On a failure, the error the client
 raised, the fields it managed before it stopped, and the Bedrock call stack under it, down to file and line.
 
+![A StartGamePacket expanded in the details pane](docs/details.png)
+
+*Every field of a `StartGamePacket`, named, typed and nested by the client's own cereal reflection.*
+
 **Bytes** — the body as one hex run, with the part the decode never reached tinted. Select a range by click, drag
 and shift-click in either half, search it for hex or text with `Ctrl+F` and `F3`, and copy as a hex dump, a hex
 stream, printable text, a C array or base64. `Show text...` puts the same output in a box instead of on the
