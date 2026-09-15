@@ -3,9 +3,9 @@ project(spyglass VERSION 0.3.1 LANGUAGES CXX)
 
 if (WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
-    set(default_clients "1.26.40.5;1.26.50.27-preview;1.26.60.21-preview")
+    set(default_clients "1.26.40;1.26.50;1.26.60.21")
 elseif (ANDROID AND ANDROID_ABI STREQUAL "x86_64")
-    set(default_clients "1.26.40.5")
+    set(default_clients "1.26.40")
 else ()
     message(FATAL_ERROR "spyglass targets 64-bit Windows, or Android x86_64 for the Linux launcher")
 endif ()
@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(MINECRAFT_CLIENTS "${default_clients}" CACHE STRING
-        "Minecraft client builds to target, e.g. 1.26.40.5;1.26.50.27-preview")
+        "Minecraft client builds to target, e.g. 1.26.40;1.26.60.21")
 
 add_subdirectory(third_party)
 
@@ -57,22 +57,26 @@ set(sources
         src/spyglass/signature.cpp)
 
 foreach (client IN LISTS MINECRAFT_CLIENTS)
-    if (NOT "${client}" MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)\\.([0-9]+)(-preview)?$")
-        message(FATAL_ERROR "a MINECRAFT_CLIENTS entry reads 1.26.50.27 or 1.26.50.27-preview, not '${client}'")
+    if (NOT "${client}" MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(\\.([0-9]+))?$")
+        message(FATAL_ERROR
+                "a MINECRAFT_CLIENTS entry reads 1.26.50 for a release or 1.26.60.21 for a preview, not '${client}'")
     endif ()
-    set(version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}.${CMAKE_MATCH_4}")
-    set(tag "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+    set(version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+    set(tag "${version}")
     if (WIN32)
         set(name "Windows ${tag}")
     else ()
         set(name "Android x86_64 ${tag}")
     endif ()
-    if (CMAKE_MATCH_5)
+    if (CMAKE_MATCH_4)
         set(preview 1)
+        set(build ${CMAKE_MATCH_5})
+        string(APPEND version ".${build}")
         string(APPEND tag ".preview")
         string(APPEND name " preview")
     else ()
         set(preview 0)
+        set(build 0)
     endif ()
     entt_for_client(${version} entt)
     message(STATUS "Minecraft client: ${name} (${version}), ${entt}")
@@ -86,7 +90,7 @@ foreach (client IN LISTS MINECRAFT_CLIENTS)
             MINECRAFT_VERSION_MAJOR=${CMAKE_MATCH_1}
             MINECRAFT_VERSION_MINOR=${CMAKE_MATCH_2}
             MINECRAFT_VERSION_PATCH=${CMAKE_MATCH_3}
-            MINECRAFT_VERSION_BUILD=${CMAKE_MATCH_4}
+            MINECRAFT_VERSION_BUILD=${build}
             MINECRAFT_PREVIEW=${preview})
     set_target_properties(${target} PROPERTIES OUTPUT_NAME spyglass-${PROJECT_VERSION}-${tag})
     target_link_libraries(${target} PRIVATE

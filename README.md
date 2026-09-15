@@ -83,7 +83,7 @@ It asks for administrator rights, and the elevated run carries on in a window of
 
 The zip holds one DLL per client build. The injector reads the running client's version and whether it is the
 preview one, and loads the newest payload beside it that does not sit above that version, so
-`spyglass-0.3.0-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.3.0-1.26.60.preview.dll` serves
+`spyglass-0.3.2-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.3.2-1.26.60.preview.dll` serves
 a 1.26.60 preview. A payload you built for some other version is picked up the same way if you drop it in beside the
 others.
 
@@ -104,13 +104,13 @@ as mods, so there is no injector and nothing to elevate. Unpack `spyglass-vX.Y.Z
 where the launcher looks, named for the client your launcher runs:
 
 ```shell
-install -D libspyglass-0.3.0-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.3.0/x86_64/libspyglass.so
+install -D libspyglass-0.3.2-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.3.2/x86_64/libspyglass.so
 ```
 
 Write a `mod.json` beside it naming the mod:
 
 ```json
-{ "name": "spyglass", "version": "0.2.0", "arch": "x86_64" }
+{ "name": "spyglass", "version": "0.3.2", "arch": "x86_64" }
 ```
 
 Then add that directory under `Mods` in the profile you play, and start the game.
@@ -153,10 +153,12 @@ preset for each platform and uploads what `cmake --install` stages.
 ### Targeting another client
 
 `MINECRAFT_CLIENTS` is the list of client builds a configure produces a payload for, one target each. The default is
-what CI ships, and any four-component version works, with `-preview` on the ones that are:
+what CI ships. A release client is named by its three-part version, a preview client by all four: the build number
+is what a preview's patterns are cut against, and a release carries its whole update line whatever its build number
+is, so the part count is what says which channel an entry means.
 
 ```shell
-cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40.5;1.26.60.21-preview"
+cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40;1.26.60.21"
 ```
 
 A version no pattern set covers fails the build rather than producing a payload that would not work.
@@ -165,12 +167,12 @@ A version no pattern set covers fails the build rather than producing a payload 
 
 | payload | client builds |
 | --- | --- |
-| `spyglass-0.3.0-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3, 1.26.45.1 |
-| `spyglass-0.3.0-1.26.50.preview.dll` | Windows preview 1.26.50.27 |
-| `spyglass-0.3.0-1.26.60.preview.dll` | Windows preview 1.26.60.21 |
-| `libspyglass-0.3.0-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
+| `spyglass-0.3.2-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3, 1.26.45.1 |
+| `spyglass-0.3.2-1.26.50.dll` | Windows release 1.26.50.5, 1.26.51.1 |
+| `spyglass-0.3.2-1.26.60.preview.dll` | Windows preview 1.26.60.21 |
+| `libspyglass-0.3.2-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
-A payload is built for one client line, release or preview, and the two preview payloads are not interchangeable. On
+A payload is built for one client line, release or preview, and no payload is interchangeable with another. On
 Windows the injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was
 not built for installs nothing and says so in the errors window, which is also where the reason is if the packet
 count stays at zero while you are connected.

@@ -4,7 +4,7 @@
 
 #include "bedrock/version.h"
 
-// Cut against Minecraft.Windows.exe 1.26.40.5, 1.26.44.3, 1.26.50.27
+// Cut against Minecraft.Windows.exe 1.26.40.5, 1.26.44.3, 1.26.50.27, 1.26.51.1
 // and 1.26.60.21, and against the x86_64 libminecraftpe.so of the 1.26.44.3
 // Android release. None of them name these functions at runtime. The Windows
 // client carries RTTI for webrtc only, and the Android .dynsym drops every game
@@ -101,9 +101,9 @@ constexpr Signatures kClient{
                      "C8 FF E0 0F 57 C0 0F 11 06 48 89 F0 48 83 C4 30 5E",
 };
 
-#elif MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 50, 0)
+#elif MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 60, 0)
 
-// 1.26.40.5, 1.26.44.3
+// 1.26.40.5, 1.26.44.3, 1.26.51.1
 constexpr Signatures kClient{
     .name = MINECRAFT_CLIENT,
     .create_packet = "56 48 83 EC 20 48 89 CE 81 FA ? 01 00 00 77 ? 89 D0 48 "
@@ -113,7 +113,7 @@ constexpr Signatures kClient{
 
 #else
 #error                                                                         \
-    "no Windows release pattern set for this client; the 1.26.50 line is preview only so far"
+    "no Windows release pattern set for this client; the 1.26.60 line is preview only so far"
 #endif
 
 constexpr std::string_view kMouseFeed =

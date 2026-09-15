@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A payload for the 1.26.50 release client, `spyglass-0.3.2-1.26.50.dll`. `spyglass.exe` picks it the
+  way it picks the others, so nothing changes about how it is run. It serves the 1.26.50 client and the
+  1.26.51 one that followed it.
+
+### Changed
+
+- **BREAKING**: a `MINECRAFT_CLIENTS` entry names a release client by three parts and a preview client
+  by four, so `1.26.40;1.26.60.21` replaces `1.26.40.5;1.26.60.21-preview`. Only a preview's build
+  number means anything: a release carries its whole update line whatever build number it ships as.
+
+### Removed
+
+- The 1.26.50 preview payload, `spyglass-0.3.1-1.26.50.preview.dll`. That line has a release client
+  now, so the preview build it was cut against is no longer the one the store hands out.
+
 ## [0.3.1] - 2026-09-02
 
 ### Changed
