@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The Linux zip holds a mod folder per client build, each with the shared object and a `mod.json`, so it
+  can be copied into the launcher's mods directory as it is.
+
 ## [0.3.2] - 2026-09-15
 
 ### Added

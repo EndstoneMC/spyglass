@@ -103,9 +103,15 @@ foreach (client IN LISTS MINECRAFT_CLIENTS)
 
     if (ANDROID)
         target_link_libraries(${target} PRIVATE log)
+        set(mod_dir spyglass-${PROJECT_VERSION}-${tag})
+        file(CONFIGURE OUTPUT ${mod_dir}/mod.json CONTENT
+                "{ \"name\": \"spyglass\", \"version\": \"${PROJECT_VERSION}\", \"arch\": \"${ANDROID_ABI}\" }\n")
+        install(TARGETS ${target} LIBRARY DESTINATION ${mod_dir})
+        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${mod_dir}/mod.json DESTINATION ${mod_dir})
+    else ()
+        install(TARGETS ${target} RUNTIME DESTINATION .)
     endif ()
 
-    install(TARGETS ${target} RUNTIME DESTINATION . LIBRARY DESTINATION .)
     if (WIN32)
         target_link_libraries(${target} PRIVATE version)
         install(FILES $<TARGET_PDB_FILE:${target}> DESTINATION . OPTIONAL)

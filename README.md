@@ -100,17 +100,13 @@ pointer is over the overlay, so mouse-look keeps working underneath an overlay l
 There the game runs under the
 [Minecraft Bedrock Launcher](https://github.com/minecraft-linux/mcpelauncher-manifest), which loads shared objects
 as mods, so there is no injector and nothing to elevate. Unpack `spyglass-vX.Y.Z-linux-x64.zip` from the
-[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below, then put the shared object
-where the launcher looks, named for the client your launcher runs:
+[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below. It holds one mod folder per
+client build, each with the shared object and its `mod.json`. Copy the one named for the client your launcher runs to
+where the launcher looks:
 
 ```shell
-install -D libspyglass-0.3.2-1.26.40.so ~/.local/share/mcpelauncher/mods/spyglass/0.3.2/x86_64/libspyglass.so
-```
-
-Write a `mod.json` beside it naming the mod:
-
-```json
-{ "name": "spyglass", "version": "0.3.2", "arch": "x86_64" }
+mkdir -p ~/.local/share/mcpelauncher/mods/spyglass/0.3.2
+cp -r spyglass-0.3.2-1.26.40 ~/.local/share/mcpelauncher/mods/spyglass/0.3.2/x86_64
 ```
 
 Then add that directory under `Mods` in the profile you play, and start the game.
