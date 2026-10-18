@@ -83,7 +83,7 @@ It asks for administrator rights, and the elevated run carries on in a window of
 
 The zip holds one DLL per client build. The injector reads the running client's version and whether it is the
 preview one, and loads the newest payload beside it that does not sit above that version, so
-`spyglass-0.3.2-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.3.2-1.26.60.preview.dll` serves
+`spyglass-0.3.3-1.26.40.dll` also serves a 1.26.45 release client while `spyglass-0.3.3-1.26.60.preview.dll` serves
 a 1.26.60 preview. A payload you built for some other version is picked up the same way if you drop it in beside the
 others.
 
@@ -105,8 +105,8 @@ client build, each with the shared object and its `mod.json`. Copy the one named
 where the launcher looks:
 
 ```shell
-mkdir -p ~/.local/share/mcpelauncher/mods/spyglass/0.3.2
-cp -r spyglass-0.3.2-1.26.40 ~/.local/share/mcpelauncher/mods/spyglass/0.3.2/x86_64
+mkdir -p ~/.local/share/mcpelauncher/mods/spyglass/0.3.3
+cp -r spyglass-0.3.3-1.26.40 ~/.local/share/mcpelauncher/mods/spyglass/0.3.3/x86_64
 ```
 
 Then add that directory under `Mods` in the profile you play, and start the game.
@@ -163,10 +163,10 @@ A version no pattern set covers fails the build rather than producing a payload 
 
 | payload | client builds |
 | --- | --- |
-| `spyglass-0.3.2-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3, 1.26.45.1 |
-| `spyglass-0.3.2-1.26.50.dll` | Windows release 1.26.50.5, 1.26.51.1 |
-| `spyglass-0.3.2-1.26.60.preview.dll` | Windows preview 1.26.60.21 |
-| `libspyglass-0.3.2-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
+| `spyglass-0.3.3-1.26.40.dll` | Windows release 1.26.40.5, 1.26.44.3, 1.26.45.1 |
+| `spyglass-0.3.3-1.26.50.dll` | Windows release 1.26.50.5, 1.26.51.1 |
+| `spyglass-0.3.3-1.26.60.preview.dll` | Windows preview 1.26.60.30 |
+| `libspyglass-0.3.3-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
 A payload is built for one client line, release or preview, and no payload is interchangeable with another. On
 Windows the injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The 1.26.60 preview payload is cut against the 1.26.60.30 preview client, the build the store now hands
+  out. It found no packets on that client, and no longer serves 1.26.60.21.
 - The Linux zip holds a mod folder per client build, each with the shared object and a `mod.json`, so it
   can be copied into the launcher's mods directory as it is.
 
