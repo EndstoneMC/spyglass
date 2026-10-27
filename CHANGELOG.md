@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added support for the 1.26.60 release client.
+- Added support for the 1.26.70 preview client.
+
+### Removed
+
+- Removed support for the 1.26.40 release client on Windows.
+- Removed support for the 1.26.60 preview client.
+
 ## [0.3.3] - 2026-10-18
 
 ### Changed

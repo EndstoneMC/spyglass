@@ -5,7 +5,7 @@
 #include "bedrock/version.h"
 
 // Cut against Minecraft.Windows.exe 1.26.40.5, 1.26.44.3, 1.26.50.27,
-// 1.26.51.1, 1.26.60.21 and 1.26.60.30, and against the x86_64
+// 1.26.51.1, 1.26.60.5, 1.26.60.21, 1.26.60.30 and 1.26.70.21, and against the x86_64
 // libminecraftpe.so of the 1.26.44.3 Android release. None of them name these
 // functions at runtime. The Windows client carries RTTI for webrtc only, and
 // the Android .dynsym drops every game symbol, so both are located the same
@@ -40,19 +40,21 @@
 // 3. the helper has exactly one caller, the NetworkSystem::runEvents packet
 // lambda. it is 0x251f
 //    bytes on 1.26.40.5, 0x2080 on 1.26.44.3 and 0x1ef3 on 1.26.50.27, and it
-//    takes each packet off the peer, creates it and reads it. it is 0x28bc
-//    bytes on 1.26.60.21 and 0x280f on 1.26.60.30, which inline the read
+//    takes each packet off the peer, creates it and reads it. it is 0x2931
+//    bytes on 1.26.60.5, 0x28bc on 1.26.60.21, and 0x280f on 1.26.60.30 and
+//    1.26.70.21, which inline the read
 // 4. createPacket is the callee whose head bounds-checks the packet id and
 // dispatches through a
 //    rip-relative jump table: cmp <id32>, <max> / ja / lea <r>, [rip+table] /
 //    movsxd rax,
 //    [<r>+rax*4] / add rax, <r> / jmp rax. <max> is the highest
 //    MinecraftPacketIds value and moves with the protocol: 0x15f on 1.26.40.5
-//    and 1.26.44.3, 0x161 on 1.26.50.27, 0x165 on 1.26.60.21 and 0x169 on
-//    1.26.60.30. nothing reads it any more, so every pattern wildcards that
-//    byte. 1.26.50.27 and 1.26.60.21 open with a 0x30 frame and a near ja,
-//    1.26.60.30 keeps the frame but takes a short ja, and the release shape is
-//    a 0x20 frame and a short ja
+//    and 1.26.44.3, 0x161 on 1.26.50.27, 0x165 on 1.26.60.21, 0x169 on
+//    1.26.60.5 and 1.26.60.30, and 0x16c on 1.26.70.21. nothing reads it any
+//    more, so every pattern wildcards that byte. 1.26.50.27, 1.26.60.21 and
+//    1.26.70.21 open with a 0x30 frame and a near ja, 1.26.60.30 keeps the
+//    frame but takes a short ja, and the release shape is a 0x20 frame and a
+//    short ja
 // 5. confirm createPacket on its cases. each one is a three-instruction tail
 // that calls a single
 //    make_packet helper and rejoins the epilogue
@@ -77,8 +79,8 @@
 // 4. the prologue pushes eight registers, spills the four register arguments,
 // then reads those
 //    stack arguments at rsp+0xb0, 0xb8, 0xc0 and 0xc8. that run is unique with
-//    no wildcard on 1.26.40.5, 1.26.44.3, 1.26.50.27, 1.26.60.21 and
-//    1.26.60.30
+//    no wildcard on 1.26.40.5, 1.26.44.3, 1.26.50.27, 1.26.60.5, 1.26.60.21,
+//    1.26.60.30 and 1.26.70.21
 
 namespace spyglass {
 
@@ -94,6 +96,18 @@ void verify_client();
 #ifdef _WIN32
 
 #if MINECRAFT_PREVIEW
+
+#if MINECRAFT_VERSION_HEX >= MINECRAFT_VERSION(1, 26, 70, 0)
+
+// 1.26.70.21
+constexpr Signatures kClient{
+    .name = MINECRAFT_CLIENT,
+    .create_packet = "56 48 83 EC 30 48 89 CE 81 FA ? 01 00 00 0F 87 ? ? ? ? "
+                     "89 D0 48 8D 0D ? ? ? ? 48 63 04 81 48 01 "
+                     "C8 FF E0 0F 57 C0 0F 11 06 48 89 F0 48 83 C4 30 5E",
+};
+
+#else
 
 #if MINECRAFT_VERSION_HEX >= MINECRAFT_VERSION(1, 26, 60, 30)
 
@@ -117,11 +131,13 @@ constexpr Signatures kClient{
 
 #endif
 
+#endif
+
 #else
 
-#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 60, 0)
+#if MINECRAFT_VERSION_HEX < MINECRAFT_VERSION(1, 26, 70, 0)
 
-// 1.26.40.5, 1.26.44.3, 1.26.51.1
+// 1.26.40.5, 1.26.44.3, 1.26.51.1, 1.26.60.5
 constexpr Signatures kClient{
     .name = MINECRAFT_CLIENT,
     .create_packet = "56 48 83 EC 20 48 89 CE 81 FA ? 01 00 00 77 ? 89 D0 48 "
@@ -131,7 +147,7 @@ constexpr Signatures kClient{
 
 #else
 #error                                                                         \
-    "no Windows release pattern set for this client; the 1.26.60 line is preview only so far"
+    "no Windows release pattern set for this client; the 1.26.70 line is preview only so far"
 #endif
 
 #endif

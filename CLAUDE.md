@@ -63,9 +63,10 @@ is pinned to the revision the launcher's own submodule sits on: the two copies s
 `ImGuiContext`, so a different revision is a different layout.
 
 EnTT is the exception, and only because it has to be: cereal's reflection *is* EnTT's, so the pin
-has to be whatever the client was compiled against, and that changed at 1.26.50. Its directory
-fetches both revisions, exposes one target each, and `entt_for_client` maps a client version to the
-right one. Nothing else picks between them, and no other dependency gets to grow a second copy.
+has to be whatever the client was compiled against, and that changed at 1.26.50 and again at
+1.26.70. Its directory fetches every revision, exposes one target each, and `entt_for_client` maps a
+client version to the right one. Nothing else picks between them, and no other dependency gets to
+grow a second copy.
 
 ### One build description
 
