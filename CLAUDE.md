@@ -191,6 +191,12 @@ the tool, not for people who wrote it: user-visible changes only, no refactoring
 structure. Group under Added / Changed / Deprecated / Removed / Fixed / Security, newest version
 first, every version linkable at the bottom.
 
+One short sentence per entry: say what changed, not why or how. A client bump is
+`Added support for the 1.26.60 release client.` and a dropped one is
+`Removed support for the 1.26.60 preview client.`, with no payload file name, no word on how the
+injector picks it and no build it was cut against. Endstone's and endweave's changelogs are the
+reference for the register, not the older entries in this one.
+
 ## Code Style
 
 clang-format from `.clang-format` (Microsoft base, Stroustrup braces, 120 columns) is the whole of
