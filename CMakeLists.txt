@@ -20,6 +20,7 @@ set(MINECRAFT_CLIENTS "${default_clients}" CACHE STRING
 add_subdirectory(third_party)
 
 set(sources
+        src/spyglass/allocator.cpp
         src/spyglass/core/output.cpp
         src/spyglass/error.cpp
         src/spyglass/filename.cpp

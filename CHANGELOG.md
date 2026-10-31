@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for the 1.26.60 release client.
 - Added support for the 1.26.70 preview client.
 
+### Fixed
+
+- Fixed a crash on 1.26.60 and later clients when a packet failed to decode for the details pane or an export.
+
 ### Removed
 
 - Removed support for the 1.26.40 release client on Windows.
