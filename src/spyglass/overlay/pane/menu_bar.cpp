@@ -393,6 +393,8 @@ void draw_about_window(bool &open)
         const auto &hooked = hooks();
         ImGui::Text("MinecraftPackets::createPacket   %p", hooked.create_packet);
         ImGui::Text("Packet::read and write           %zu classes", hooked.packet_classes);
+        ImGui::Text("PacketSchemaReader               %p, pushMember at slot %zu", hooked.schema_reader,
+                    hooked.schema_member_slot);
     }
     ImGui::End();
 }

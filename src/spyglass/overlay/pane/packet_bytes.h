@@ -24,6 +24,9 @@ struct BytesView {
     bool hovering{false};
     bool selected{false};
     bool dragging{false};
+    int field{-1};
+    bool locate{false};
+    bool reveal{false};
     long long scroll_to_row{-1};
     char query[128]{};
     bool query_hex{true};

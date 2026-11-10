@@ -17,25 +17,24 @@
 #endif
 
 namespace spyglass {
+
+#ifndef _WIN32
 namespace {
-
-#ifdef _WIN32
-
-std::vector<std::span<const std::byte>> code_regions()
-{
-    return {hat::process::get_process_module().get_section_data(".text")};
-}
-
-#else
 
 constexpr std::string_view kClientLibrary = "libminecraftpe.so";
 
-/**
- * The client is mapped by the launcher's own linker rather than the system one, so it is
- * absent from dl_iterate_phdr. Its executable mappings are still in /proc/self/maps.
- */
-std::vector<std::span<const std::byte>> code_regions()
+}  // namespace
+#endif
+
+std::vector<std::span<const std::byte>> client_regions(const bool code)
 {
+#ifdef _WIN32
+    const auto module = hat::process::get_process_module();
+    return {code ? module.get_section_data(".text") : module.get_module_data()};
+#else
+    // The client is mapped by the launcher's own linker rather than the system one, so it is
+    // absent from dl_iterate_phdr. Its executable mappings are still in /proc/self/maps.
+    static_cast<void>(code);
     std::vector<std::span<const std::byte>> regions;
     std::ifstream maps{"/proc/self/maps"};
     for (std::string line; std::getline(maps, line);) {
@@ -57,11 +56,8 @@ std::vector<std::span<const std::byte>> code_regions()
         regions.emplace_back(reinterpret_cast<const std::byte *>(begin), end - begin);
     }
     return regions;
-}
-
 #endif
-
-}  // namespace
+}
 
 void *find(const std::string_view pattern)
 {
@@ -70,7 +66,7 @@ void *find(const std::string_view pattern)
         throw std::runtime_error{"malformed pattern"};
     }
 
-    const auto regions = code_regions();
+    const auto regions = client_regions(true);
     if (regions.empty()) {
         throw std::runtime_error{"the client library is not mapped yet"};
     }

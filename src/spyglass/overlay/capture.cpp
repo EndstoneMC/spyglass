@@ -4,6 +4,7 @@
 #include <chrono>
 #include <utility>
 
+#include "spyglass/network.h"
 #include "spyglass/reflect.h"
 
 namespace spyglass {
@@ -330,12 +331,62 @@ void Capture::stop()
     running_ = false;
 }
 
+Ranges Capture::ranges(const std::uint64_t number)
+{
+    const std::lock_guard lock{ranges_mutex_};
+    if (const auto at = std::ranges::find(ranges_, number, &std::pair<std::uint64_t, Ranges>::first);
+        at != ranges_.end()) {
+        ranges_.splice(ranges_.begin(), ranges_, at);
+        return ranges_.front().second;
+    }
+
+    Entry entry;
+    if (!store_.at(number, entry)) {
+        return {};
+    }
+    std::optional<FieldRanges> ready;
+    if (decode_mode(entry.id) == DecodeMode::Eager) {
+        ready = take_ranges(number);
+        if (!ready && ranges_requested_ != number) {
+            const auto blob = store_.read(entry);
+            if (blob.body) {
+                request_ranges(number, entry.id,
+                               std::string{reinterpret_cast<const char *>(blob.body->data()), blob.body->size()});
+                ranges_requested_ = number;
+            }
+        }
+    }
+    else {
+        const auto blob = store_.read(entry);
+        if (blob.body) {
+            ready = read_ranges(entry.id, {reinterpret_cast<const char *>(blob.body->data()), blob.body->size()});
+        }
+    }
+    if (!ready) {
+        return {};
+    }
+
+    ranges_.emplace_front(number, std::make_shared<const FieldRanges>(std::move(*ready)));
+    if (ranges_requested_ == number) {
+        ranges_requested_ = 0;
+    }
+    while (ranges_.size() > kRangeCache) {
+        ranges_.pop_back();
+    }
+    return ranges_.front().second;
+}
+
 void Capture::restart()
 {
     {
         const std::lock_guard lock{fields_mutex_};
         fields_.clear();
         field_at_.clear();
+    }
+    {
+        const std::lock_guard lock{ranges_mutex_};
+        ranges_.clear();
+        ranges_requested_ = 0;
     }
 
     const std::lock_guard lock{mutex_};

@@ -186,6 +186,9 @@ void draw_packet_bytes(const Details *const details, const std::uint64_t number,
     if (number != view.record) {
         view.record = number;
         view.selected = false;
+        view.field = -1;
+        view.locate = false;
+        view.reveal = false;
         view.dragging = false;
         view.hovering = false;
         view.matches.clear();
@@ -354,7 +357,9 @@ void draw_packet_bytes(const Details *const details, const std::uint64_t number,
                 view.anchor = *hovered;
                 view.cursor = *hovered;
                 view.selected = true;
+                view.locate = true;
             }
+            view.field = -1;
             view.dragging = true;
         }
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {

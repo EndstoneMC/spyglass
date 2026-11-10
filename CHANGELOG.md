@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Apply as Filter and Prepare as Filter to the Analyze menu and to the right-click menus of the packet list, the details tree, Statistics ▸ Packet Types and the expert information window.
 - Added completion of packet and field names and a list of recent filters to the filter bar.
 - Added `Ctrl+/` to jump to the filter bar.
+- Selecting a field in the details pane now highlights its bytes, and clicking a byte selects the field it belongs to.
 
 ### Changed
 
+- Clicking a row in the details pane now selects it, and the arrow or a double-click opens it.
 - The filter window is now Analyze ▸ Display Filter Expression..., which builds a filter for the filter bar.
 - `Hide` and `Show only` on the packet list's right-click menu are replaced by Apply as Filter ▸ Not Selected and Selected.
 - Packet exports now start with the summary line and details on and the bytes off.

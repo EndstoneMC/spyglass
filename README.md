@@ -31,7 +31,7 @@ The overlay is laid out like Wireshark, with three panes:
   and the list follows the newest packet until you scroll up.
 - **Details.** The packet's decoded fields, with the names and enum values the client itself uses. NBT opens as a tag
   tree. For a failed decode you also get the client's error, the fields it read before it stopped, and the call stack
-  down to file and line.
+  down to file and line. Click a field to highlight its bytes, or click a byte to select the field it belongs to.
 - **Bytes.** The packet body in hex, with the part the client never read tinted. Search it with `Ctrl+F` and `F3`, and
   copy a selection as a hex dump, a hex stream, text, a C array or base64.
 

@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "spyglass/field_range.h"
 #include "spyglass/overlay/store.h"
 
 namespace spyglass {
@@ -62,6 +63,7 @@ struct Failure {
 
 constexpr std::size_t kLengthBuckets = 10;
 constexpr std::size_t kFieldCache = 256;
+constexpr std::size_t kRangeCache = 16;
 
 struct CaptureOptions {
     StoreOptions store;
@@ -130,6 +132,7 @@ public:
     [[nodiscard]] Details details(std::uint64_t number) const;
     [[nodiscard]] std::optional<Details> selected_details() const;
     [[nodiscard]] Fields fields(std::uint64_t number);
+    [[nodiscard]] Ranges ranges(std::uint64_t number);
     [[nodiscard]] std::uint64_t bad() const;
     [[nodiscard]] std::vector<std::uint64_t> counts() const;
     [[nodiscard]] std::vector<Failure> failures() const;
@@ -175,6 +178,10 @@ private:
     mutable std::mutex fields_mutex_;
     mutable std::list<std::pair<std::uint64_t, Fields>> fields_;
     mutable std::unordered_map<std::uint64_t, std::list<std::pair<std::uint64_t, Fields>>::iterator> field_at_;
+
+    std::mutex ranges_mutex_;
+    std::list<std::pair<std::uint64_t, Ranges>> ranges_;
+    std::uint64_t ranges_requested_{0};
 };
 
 }  // namespace spyglass
