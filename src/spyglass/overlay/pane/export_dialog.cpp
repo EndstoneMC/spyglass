@@ -170,7 +170,7 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
         ImGui::SetNextWindowFocus();
         dialog.command = options.export_command;
         dialog.seeded = true;
-        dialog.type = 0;
+        dialog.type = dialog.command == ExportCommand::Packets ? static_cast<int>(dialog.options.format) : 0;
         dialog.selected = -1;
         dialog.relist = true;
         dialog.confirming = false;
@@ -181,7 +181,8 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
         const auto *const kind = dialog.command == ExportCommand::Packets         ? "packets"
                                  : dialog.command == ExportCommand::SelectedBytes ? "bytes"
                                                                                   : "summary";
-        set_text(dialog.name, sizeof(dialog.name), export_name(kind, types_of(dialog.command)[0].second));
+        set_text(dialog.name, sizeof(dialog.name),
+                 export_name(kind, types_of(dialog.command)[static_cast<std::size_t>(dialog.type)].second));
     }
     if (!options.export_dialog) {
         dialog.seeded = false;
@@ -193,14 +194,6 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
 
     if (dialog.command == ExportCommand::Packets) {
         dialog.options.format = static_cast<ExportFormat>(dialog.type);
-        if (dialog.options.format == ExportFormat::Csv) {
-            dialog.options.summary = true;
-            dialog.options.details = false;
-            dialog.options.bytes = false;
-        }
-        else if (dialog.options.format == ExportFormat::Json) {
-            dialog.options.summary = true;
-        }
     }
 
     const auto *const heading = dialog.command == ExportCommand::Packets ? "Spyglass: export packets"
@@ -408,6 +401,7 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
     const auto counters = capture.counters();
     const auto newest = counters.written;
     std::uint64_t chosen_count = 0;
+    ExportOptions chosen;
 
     if (dialog.command == ExportCommand::Packets) {
         dialog.options.range = parse_range(dialog.range);
@@ -539,25 +533,39 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
         }
 
         ImGui::SeparatorText("Packet Format");
-        const auto csv = dialog.options.format == ExportFormat::Csv;
-        const auto json = dialog.options.format == ExportFormat::Json;
+        chosen = dialog.options;
+        const auto csv = chosen.format == ExportFormat::Csv;
+        const auto json = chosen.format == ExportFormat::Json;
+        if (csv || json) {
+            chosen.summary = true;
+        }
+        if (csv) {
+            chosen.details = false;
+            chosen.bytes = false;
+        }
 
         ImGui::BeginDisabled(csv || json);
-        ImGui::Checkbox("Packet summary line", &dialog.options.summary);
+        if (ImGui::Checkbox("Packet summary line", &chosen.summary)) {
+            dialog.options.summary = chosen.summary;
+        }
         ImGui::EndDisabled();
         ImGui::BeginDisabled(csv);
-        ImGui::Checkbox("Packet details", &dialog.options.details);
+        if (ImGui::Checkbox("Packet details", &chosen.details)) {
+            dialog.options.details = chosen.details;
+        }
         ImGui::SameLine();
-        ImGui::Checkbox("Packet bytes", &dialog.options.bytes);
+        if (ImGui::Checkbox("Packet bytes", &chosen.bytes)) {
+            dialog.options.bytes = chosen.bytes;
+        }
         ImGui::EndDisabled();
 
         const auto average =
             newest == 0 ? 0.0 : static_cast<double>(counters.stored_bytes) / static_cast<double>(newest);
         auto per_packet = 72.0;
-        if (dialog.options.bytes) {
-            per_packet += (dialog.options.format == ExportFormat::Text ? 4.4 : 1.4) * average;
+        if (chosen.bytes) {
+            per_packet += (chosen.format == ExportFormat::Text ? 4.4 : 1.4) * average;
         }
-        if (dialog.options.details) {
+        if (chosen.details) {
             per_packet += 512.0;
         }
         std::error_code ec;
@@ -591,7 +599,7 @@ void draw_export_dialog(const Capture &capture, const Filter &filter, const Pack
         dialog.job.path = target;
         switch (dialog.command) {
         case ExportCommand::Packets:
-            begin_export(dialog.job, capture, filter, list.marks, dialog.options, target);
+            begin_export(dialog.job, capture, filter, list.marks, chosen, target);
             break;
         case ExportCommand::SelectedBytes: {
             const auto selection = capture.selected_details();

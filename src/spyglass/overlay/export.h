@@ -51,8 +51,8 @@ struct ExportOptions {
     PacketSelection selection{PacketSelection::All};
     ExportRange range;
     bool summary{true};
-    bool details{false};
-    bool bytes{true};
+    bool details{true};
+    bool bytes{false};
 };
 
 struct ExportJob {

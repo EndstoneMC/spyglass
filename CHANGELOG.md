@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Packet exports now start with the summary line and details on and the bytes off.
+- The export dialog now keeps the format you last chose.
+
+### Fixed
+
+- Fixed choosing CSV in the export dialog turning off details and bytes for later text exports.
+
 ## [0.3.4] - 2026-11-10
 
 ### Added
