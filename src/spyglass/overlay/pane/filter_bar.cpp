@@ -101,6 +101,10 @@ void draw_filter_bar(Filter &filter, FilterBar &bar, bool &builder_open)
             return 0;
         },
         &bar);
+    if (apply) {
+        bar.focus = true;
+        bar.to_end = true;
+    }
     const auto active = ImGui::IsItemActive();
     const auto hovered = ImGui::IsItemHovered();
     const ImVec2 below{ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y};
