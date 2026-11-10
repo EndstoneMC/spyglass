@@ -37,8 +37,27 @@ The overlay is laid out like Wireshark, with three panes:
 
 ![A StartGamePacket expanded in the details pane](docs/details.png)
 
-`Filter` on the toolbar lists every packet id the client knows, with a tick box and a count for each. Untick an id to
-hide it, or show only failed decodes or one direction. Right-click a packet in the list to hide it or show only it.
+Filtering works the way it does in Wireshark. Type a display filter in the bar under the toolbar, or press `Ctrl+/` to
+jump there, and press Enter. The bar turns green when the filter is valid and red when it is not, and suggests packet
+and field names as you type. Press Tab to take a suggestion.
+
+| Filter | Shows |
+| --- | --- |
+| `MovePlayer` or `MovePlayerPacket` | that packet |
+| `!(MovePlayer \|\| LevelChunk)` | everything except those two packets |
+| `name contains "Item"` | every packet with Item in its name |
+| `failed` | packets the client failed to decode |
+| `unread > 0` | packets the client left bytes of unread |
+| `sent`, `received` | packets in one direction |
+| `id == 0x09`, `frame.len > 1000`, `frame.number >= 500` | packets by id, length or number |
+
+Join terms with `&&`, `||`, `!` and parentheses, or with `and`, `or` and `not`. Comparisons also take `eq`, `ne`, `gt`,
+`lt`, `ge` and `le`.
+
+To build a filter from something on screen, right-click it and choose `Apply as Filter` or `Prepare as Filter`. This
+works on a packet, a row of the details tree, a row of `Statistics` ▸ `Packet Types` and a group in the expert
+information window. In the packet list, the column you right-click decides the field. The arrow at the end of the bar
+lists recent filters, and `Expression...` opens a builder that lists every field and every packet seen so far.
 
 `Start`, `Stop` and `Restart` control the capture. A capture has no length limit, and Spyglass deletes it when the
 client closes. `Capture` ▸ `Options` sets how much memory it uses and can turn off capturing sent packets. The status
@@ -51,8 +70,8 @@ The menus hold everything else:
 - `Edit` finds packets by name, id, or hex or text in the body. It also marks packets, sets the zero of the `Time`
   column, and copies rows or the details tree as text or CSV.
 - `View` hides panes, zooms, opens a packet in its own window, and sets what the `Time` column shows.
-- `Analyze` groups failed decodes by error and packet, and reads the selected bytes as an integer, a float, a varint
-  and text.
+- `Analyze` opens the filter builder, groups failed decodes by error and packet, and reads the selected bytes as an
+  integer, a float, a varint and text.
 - `Statistics` shows a breakdown per packet id, the distribution of packet lengths and a graph of packets or bytes per
   second.
 - `File` exports packets as text, CSV or JSON, the selected bytes as a raw file, or a session summary. The save dialog

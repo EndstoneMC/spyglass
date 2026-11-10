@@ -37,6 +37,7 @@ set(sources
         src/spyglass/overlay/navigate.cpp
         src/spyglass/overlay/pane/expert_window.cpp
         src/spyglass/overlay/pane/export_dialog.cpp
+        src/spyglass/overlay/pane/filter_bar.cpp
         src/spyglass/overlay/pane/filter_window.cpp
         src/spyglass/overlay/pane/menu_bar.cpp
         src/spyglass/overlay/pane/packet_bytes.cpp

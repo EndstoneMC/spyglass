@@ -8,6 +8,7 @@
 #include "spyglass/overlay/options.h"
 #include "spyglass/overlay/pane/expert_window.h"
 #include "spyglass/overlay/pane/export_dialog.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/pane/filter_window.h"
 #include "spyglass/overlay/pane/packet_bytes.h"
 #include "spyglass/overlay/pane/packet_list.h"
@@ -43,6 +44,7 @@ private:
     float list_share_{0.45F};
     float details_share_{0.30F};
     PacketList list_;
+    FilterBar filter_bar_;
     FilterWindow filter_window_;
     ExpertWindow expert_window_;
     ExportDialog export_dialog_;

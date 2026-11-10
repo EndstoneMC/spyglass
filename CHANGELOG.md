@@ -7,10 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a display filter bar under the toolbar that takes Wireshark's syntax, such as `!MovePlayer && frame.len > 1000`.
+- Added Apply as Filter and Prepare as Filter to the Analyze menu and to the right-click menus of the packet list, the details tree, Statistics ▸ Packet Types and the expert information window.
+- Added completion of packet and field names and a list of recent filters to the filter bar.
+- Added `Ctrl+/` to jump to the filter bar.
+
 ### Changed
 
+- The filter window is now Analyze ▸ Display Filter Expression..., which builds a filter for the filter bar.
+- `Hide` and `Show only` on the packet list's right-click menu are replaced by Apply as Filter ▸ Not Selected and Selected.
 - Packet exports now start with the summary line and details on and the bytes off.
 - The export dialog now keeps the format you last chose.
+
+### Removed
+
+- Removed the filter window's tick boxes for packets, failed decodes and direction, which the filter bar replaces.
 
 ### Fixed
 

@@ -12,6 +12,7 @@
 namespace spyglass {
 
 class Capture;
+struct FilterBar;
 struct ViewOptions;
 
 enum class FindScope : int {
@@ -52,11 +53,13 @@ struct PacketList {
     PacketFind find;
     int menu_id{-1};
     std::string menu_name;
+    std::string menu_term;
     std::string menu_row;
 };
 
 void draw_find_bar(Capture &capture, const Filter &filter, PacketList &list, ViewOptions &options);
 
-void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOptions &options, float height);
+void draw_packet_list(Capture &capture, Filter &filter, FilterBar &bar, PacketList &list, ViewOptions &options,
+                      float height);
 
 }  // namespace spyglass

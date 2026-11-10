@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
+#include <format>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@
 #include "spyglass/network.h"
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/options.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
@@ -58,7 +60,7 @@ void draw_properties(const Statistics &statistics)
                 statistics.outbound_bytes);
 }
 
-void draw_types(const Statistics &statistics)
+void draw_types(const Statistics &statistics, Filter &filter, FilterBar &bar)
 {
     const auto &names = packet_names();
     std::size_t bytes = 0;
@@ -117,6 +119,15 @@ void draw_types(const Statistics &statistics)
         const auto index = static_cast<std::size_t>(id);
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
+        ImGui::PushID(id);
+        ImGui::Selectable("##type", false, ImGuiSelectableFlags_SpanAllColumns);
+        if (ImGui::BeginPopupContextItem()) {
+            draw_filter_menus(filter, bar,
+                              index < names.size() && !names[index].empty() ? names[index] : std::format("id == {}", id));
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+        ImGui::SameLine();
         ImGui::Text("%d", id);
         ImGui::TableNextColumn();
         if (index < names.size() && !names[index].empty()) {
@@ -213,7 +224,7 @@ void draw_graph(const Statistics &statistics, const bool by_bytes)
 
 }  // namespace
 
-void draw_statistics_window(const Capture &capture, ViewOptions &options)
+void draw_statistics_window(const Capture &capture, Filter &filter, FilterBar &bar, ViewOptions &options)
 {
     ImGui::SetNextWindowSize(ImVec2{640.0F, 440.0F}, ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Spyglass: statistics", &options.statistics_window)) {
@@ -234,7 +245,7 @@ void draw_statistics_window(const Capture &capture, ViewOptions &options)
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Packet Types", nullptr, tab(StatisticsTab::Types))) {
-            draw_types(statistics);
+            draw_types(statistics, filter, bar);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Packet Lengths", nullptr, tab(StatisticsTab::Lengths))) {

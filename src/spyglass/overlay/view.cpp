@@ -9,6 +9,7 @@
 
 #include "spyglass/overlay/pane/expert_window.h"
 #include "spyglass/overlay/pane/export_dialog.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/pane/filter_window.h"
 #include "spyglass/overlay/pane/menu_bar.h"
 #include "spyglass/overlay/pane/packet_bytes.h"
@@ -80,7 +81,7 @@ void View::draw()
     }
 
     if (options_.filter_window && interactive_) {
-        draw_filter_window(capture_, filter_, filter_window_, options_.filter_window);
+        draw_filter_window(capture_, filter_, filter_bar_, filter_window_, options_.filter_window);
     }
 
     if (options_.capture_options_window) {
@@ -92,11 +93,11 @@ void View::draw()
     }
 
     if (options_.expert_window) {
-        draw_expert_window(capture_, list_, expert_window_, options_.expert_window);
+        draw_expert_window(capture_, filter_, filter_bar_, list_, expert_window_, options_.expert_window);
     }
 
     if (options_.statistics_window) {
-        draw_statistics_window(capture_, options_);
+        draw_statistics_window(capture_, filter_, filter_bar_, options_);
     }
 
     if (options_.export_dialog || export_dialog_.job.running || !export_dialog_.job.message.empty()) {
@@ -107,8 +108,9 @@ void View::draw()
     if (ImGui::Begin("Spyglass", &visible_,
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar |
                          ImGuiWindowFlags_NoBringToFrontOnFocus)) {
-        draw_menu_bar(capture_, filter_, list_, options_);
-        draw_toolbar(capture_, filter_, options_.filter_window);
+        draw_menu_bar(capture_, filter_, filter_bar_, list_, options_);
+        draw_toolbar(capture_);
+        draw_filter_bar(filter_, filter_bar_, options_.filter_window);
         if (options_.find_bar) {
             draw_find_bar(capture_, filter_, list_, options_);
         }
@@ -133,14 +135,14 @@ void View::draw()
         const auto number = capture_.selected();
 
         if (splitter_count == 0.0F) {
-            draw_packet_list(capture_, filter_, list_, options_, usable);
+            draw_packet_list(capture_, filter_, filter_bar_, list_, options_, usable);
         }
         else {
             const float list_height = std::clamp(usable * list_share_, smallest, usable - (splitter_count * smallest));
             if (usable > 0.0F) {
                 list_share_ = list_height / usable;
             }
-            draw_packet_list(capture_, filter_, list_, options_, list_height);
+            draw_packet_list(capture_, filter_, filter_bar_, list_, options_, list_height);
             splitter("list_splitter", list_share_, usable);
 
             if (options_.details_pane && options_.bytes_pane) {
@@ -148,12 +150,12 @@ void View::draw()
                 if (usable > 0.0F) {
                     details_share_ = details / usable;
                 }
-                draw_packet_details(capture_, record, options_, details);
+                draw_packet_details(capture_, record, filter_, filter_bar_, options_, details);
                 splitter("details_splitter", details_share_, usable);
                 draw_packet_bytes(record, number, bytes_view_, options_, usable - list_height - details);
             }
             else if (options_.details_pane) {
-                draw_packet_details(capture_, record, options_, usable - list_height);
+                draw_packet_details(capture_, record, filter_, filter_bar_, options_, usable - list_height);
             }
             else {
                 draw_packet_bytes(record, number, bytes_view_, options_, usable - list_height);
@@ -186,7 +188,8 @@ void View::draw()
         if (ImGui::Begin(title, &open.open)) {
             const auto pinned = capture_.details(open.number);
             const auto *const record = pinned.record.number == 0 ? nullptr : &pinned;
-            draw_packet_details(capture_, record, options_, ImGui::GetContentRegionAvail().y * 0.4F);
+            draw_packet_details(capture_, record, filter_, filter_bar_, options_,
+                                ImGui::GetContentRegionAvail().y * 0.4F);
             draw_packet_bytes(record, open.number, open.bytes, options_, ImGui::GetContentRegionAvail().y);
         }
         ImGui::End();

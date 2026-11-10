@@ -8,12 +8,14 @@
 
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/navigate.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/pane/packet_list.h"
 #include "spyglass/overlay/theme.h"
 
 namespace spyglass {
 
-void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert, bool &open)
+void draw_expert_window(Capture &capture, Filter &filter, FilterBar &bar, PacketList &list, ExpertWindow &expert,
+                        bool &open)
 {
     ImGui::SetNextWindowSize(ImVec2{620.0F, 380.0F}, ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Spyglass: expert information", &open)) {
@@ -54,6 +56,12 @@ void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert
             ImGui::PopStyleColor();
             if (selected) {
                 show_packet(capture, list, row.first);
+            }
+            if (ImGui::BeginPopupContextItem()) {
+                draw_filter_menus(filter, bar,
+                                  row.name.empty() ? std::format("failed && id == {}", row.id)
+                                                   : std::format("failed && {}", row.name));
+                ImGui::EndPopup();
             }
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", std::format("packets {} to {}", row.first, row.last).c_str());

@@ -11,6 +11,7 @@
 
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/options.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/report.h"
 #include "spyglass/overlay/theme.h"
 #include "spyglass/reflect.h"
@@ -99,7 +100,8 @@ void draw_failure(const ViewOptions &options, const nlohmann::ordered_json &erro
 
 }  // namespace
 
-void draw_packet_details(Capture &capture, const Details *const details, ViewOptions &options, const float height)
+void draw_packet_details(Capture &capture, const Details *const details, Filter &filter, FilterBar &bar,
+                         ViewOptions &options, const float height)
 {
     ImGui::BeginChild("details", ImVec2{-1.0F, height}, ImGuiChildFlags_Borders);
 
@@ -109,11 +111,24 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
         const std::size_t length = details->body ? details->body->size() : 0;
 
         set_open(options);
-        if (ImGui::TreeNodeEx("frame", kBranch, "Frame %llu: %zu bytes captured at %.6f", number, length,
-                              record->time)) {
+        const auto frame_open = ImGui::TreeNodeEx("frame", kBranch, "Frame %llu: %zu bytes captured at %.6f", number,
+                                                  length, record->time);
+        if (ImGui::BeginPopupContextItem()) {
+            draw_filter_menus(filter, bar, std::format("frame.number == {}", number));
+            ImGui::EndPopup();
+        }
+        if (frame_open) {
             ImGui::TreeNodeEx("number", kLeaf, "Number: %llu", number);
+            if (ImGui::BeginPopupContextItem()) {
+                draw_filter_menus(filter, bar, std::format("frame.number == {}", number));
+                ImGui::EndPopup();
+            }
             ImGui::TreeNodeEx("time", kLeaf, "Time: %.6f", record->time);
             ImGui::TreeNodeEx("length", kLeaf, "Length: %zu bytes", length);
+            if (ImGui::BeginPopupContextItem()) {
+                draw_filter_menus(filter, bar, std::format("frame.len == {}", record->length));
+                ImGui::EndPopup();
+            }
             ImGui::TreePop();
         }
 
@@ -121,12 +136,22 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
 
         ImGui::PushID(static_cast<int>(record->number));
         set_open(options);
-        if (ImGui::TreeNodeEx("packet", bare ? kLeaf : kBranch, "Bedrock Protocol: %.*s (%d)",
+        const auto packet_open =
+            ImGui::TreeNodeEx("packet", bare ? kLeaf : kBranch, "Bedrock Protocol: %.*s (%d)",
                               record->name.empty() ? 7 : static_cast<int>(record->name.size()),
-                              record->name.empty() ? "unnamed" : record->name.data(), record->id) &&
-            !bare) {
+                              record->name.empty() ? "unnamed" : record->name.data(), record->id);
+        if (ImGui::BeginPopupContextItem()) {
+            draw_filter_menus(filter, bar,
+                              record->name.empty() ? std::format("id == {}", record->id) : std::string{record->name});
+            ImGui::EndPopup();
+        }
+        if (packet_open && !bare) {
             if (record->unread > 0) {
                 ImGui::TreeNodeEx("unread", kLeaf, "Unread: %u bytes", record->unread);
+                if (ImGui::BeginPopupContextItem()) {
+                    draw_filter_menus(filter, bar, std::format("unread == {}", record->unread));
+                    ImGui::EndPopup();
+                }
             }
 
             const auto fields = capture.fields(record->number);
@@ -149,11 +174,18 @@ void draw_packet_details(Capture &capture, const Details *const details, ViewOpt
             ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
             ImGui::SetNextItemOpen(true, ImGuiCond_Once);
             set_open(options);
-            if (ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped)) {
+            const auto error_open = ImGui::TreeNodeEx("error", kBranch, "Decode error at 0x%zX", stopped);
+            ImGui::PopStyleColor();
+            if (ImGui::BeginPopupContextItem()) {
+                draw_filter_menus(filter, bar, "failed");
+                ImGui::EndPopup();
+            }
+            if (error_open) {
+                ImGui::PushStyleColor(ImGuiCol_Text, kBadPacket);
                 draw_failure(options, details->error, 0, 0);
+                ImGui::PopStyleColor();
                 ImGui::TreePop();
             }
-            ImGui::PopStyleColor();
         }
     }
 

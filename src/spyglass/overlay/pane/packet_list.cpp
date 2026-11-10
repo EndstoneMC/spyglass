@@ -4,7 +4,9 @@
 #include <cstddef>
 #include <cstdio>
 #include <ctime>
+#include <format>
 #include <iterator>
+#include <string>
 #include <string_view>
 
 #include <imgui.h>
@@ -15,6 +17,7 @@
 #include "spyglass/overlay/capture.h"
 #include "spyglass/overlay/navigate.h"
 #include "spyglass/overlay/options.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/report.h"
 #include "spyglass/overlay/theme.h"
 
@@ -110,7 +113,8 @@ void draw_find_bar(Capture &capture, const Filter &filter, PacketList &list, Vie
     }
 }
 
-void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOptions &options, const float height)
+void draw_packet_list(Capture &capture, Filter &filter, FilterBar &bar, PacketList &list, ViewOptions &options,
+                      const float height)
 {
     if (filter != list.applied) {
         list.applied = filter;
@@ -237,6 +241,24 @@ void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOp
                 list.menu_id = record.id;
                 list.menu_name = record.name;
                 list.menu_row = report_row(record);
+                switch (ImGui::TableGetHoveredColumn()) {
+                case 0:
+                    list.menu_term = std::format("frame.number == {}", record.number);
+                    break;
+                case 2:
+                case 3:
+                    list.menu_term = record.direction == Direction::Outbound ? "sent" : "received";
+                    break;
+                case 4:
+                    list.menu_term = std::format("id == {}", record.id);
+                    break;
+                case 5:
+                    list.menu_term = std::format("frame.len == {}", record.length);
+                    break;
+                default:
+                    list.menu_term = record.name.empty() ? std::format("id == {}", record.id) : std::string{record.name};
+                    break;
+                }
                 open_menu = true;
             }
 
@@ -288,31 +310,11 @@ void draw_packet_list(Capture &capture, Filter &filter, PacketList &list, ViewOp
         ImGui::OpenPopup("packet_menu");
     }
     if (ImGui::BeginPopup("packet_menu")) {
-        if (const auto &names = packet_names(); filter.enabled.size() < names.size()) {
-            filter.enabled.resize(names.size(), 1);
-        }
+        draw_filter_menus(filter, bar, list.menu_term);
+        ImGui::Separator();
 
         char label[192];
         ImGui::BeginDisabled(list.menu_id < 0);
-        if (list.menu_name.empty()) {
-            std::snprintf(label, sizeof(label), "Hide id %d", list.menu_id);
-        }
-        else {
-            std::snprintf(label, sizeof(label), "Hide %s", list.menu_name.c_str());
-        }
-        if (ImGui::MenuItem(label)) {
-            filter.allow(list.menu_id, false);
-        }
-        if (list.menu_name.empty()) {
-            std::snprintf(label, sizeof(label), "Show only id %d", list.menu_id);
-        }
-        else {
-            std::snprintf(label, sizeof(label), "Show only %s", list.menu_name.c_str());
-        }
-        if (ImGui::MenuItem(label)) {
-            std::fill(filter.enabled.begin(), filter.enabled.end(), std::uint8_t{0});
-            filter.allow(list.menu_id, true);
-        }
         if (list.menu_name.empty()) {
             std::snprintf(label, sizeof(label), "Next id %d", list.menu_id);
         }

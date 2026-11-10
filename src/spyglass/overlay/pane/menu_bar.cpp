@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <format>
 #include <string>
 #include <utility>
 
@@ -16,6 +17,7 @@
 #include "spyglass/overlay/filter.h"
 #include "spyglass/overlay/navigate.h"
 #include "spyglass/overlay/options.h"
+#include "spyglass/overlay/pane/filter_bar.h"
 #include "spyglass/overlay/pane/packet_list.h"
 #include "spyglass/overlay/report.h"
 #include "spyglass/overlay/theme.h"
@@ -45,7 +47,7 @@ void time_format(ViewOptions &options, const char *label, const TimeFormat forma
 
 }  // namespace
 
-void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptions &options)
+void draw_menu_bar(Capture &capture, Filter &filter, FilterBar &bar, PacketList &list, ViewOptions &options)
 {
     if (!ImGui::BeginMenuBar()) {
         return;
@@ -258,6 +260,13 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
     }
 
     if (ImGui::BeginMenu("Analyze")) {
+        ImGui::MenuItem("Display Filter Expression...", nullptr, &options.filter_window);
+        const auto chosen = capture.selected() == 0 ? Record{} : capture.at_number(capture.selected());
+        draw_filter_menus(filter, bar,
+                          chosen.number == 0   ? std::string{}
+                          : chosen.name.empty() ? std::format("id == {}", chosen.id)
+                                                : std::string{chosen.name});
+        ImGui::Separator();
         ImGui::MenuItem("Expert Information", nullptr, &options.expert_window);
         ImGui::MenuItem("Interpret Selection", nullptr, &options.inspector);
         ImGui::EndMenu();
@@ -286,7 +295,6 @@ void draw_menu_bar(Capture &capture, Filter &filter, PacketList &list, ViewOptio
         }
         ImGui::Separator();
         ImGui::MenuItem("Options", nullptr, &options.capture_options_window);
-        ImGui::MenuItem("Filter", nullptr, &options.filter_window);
         ImGui::EndMenu();
     }
 

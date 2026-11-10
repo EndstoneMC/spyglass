@@ -7,6 +7,8 @@
 
 namespace spyglass {
 
+struct Filter;
+struct FilterBar;
 struct PacketList;
 
 struct ExpertWindow {
@@ -14,6 +16,7 @@ struct ExpertWindow {
     std::vector<Failure> rows;
 };
 
-void draw_expert_window(Capture &capture, PacketList &list, ExpertWindow &expert, bool &open);
+void draw_expert_window(Capture &capture, Filter &filter, FilterBar &bar, PacketList &list, ExpertWindow &expert,
+                        bool &open);
 
 }  // namespace spyglass
