@@ -5,7 +5,7 @@
 
 <p>
   <b>A packet capture that runs inside the Minecraft: Bedrock client</b><br>
-  Every packet the client sends and receives, and for the ones it fails to read, where it gave up and why
+  Every packet the client sends and receives, and the reason it rejected the ones it could not read
 </p>
 
 [![CI](https://github.com/EndstoneMC/spyglass/actions/workflows/ci.yml/badge.svg)](https://github.com/EndstoneMC/spyglass/actions/workflows/ci.yml)
@@ -17,175 +17,146 @@
 
 ![The Spyglass overlay running in the client](docs/screenshot.png)
 
-## What you get
+## Why Spyglass?
 
-**List** — every packet of the session, oldest first: direction, id, length, name. Follows the tail until you scroll
-away from it. Failed decodes are coloured.
+If you write server software, a proxy or a protocol translator, a packet the client cannot read usually shows up as a
+dropped connection or a world that looks wrong. Spyglass runs inside the client and shows you the packet, how far the
+client read into it, and the error it raised.
 
-**Details** — the frame, the packet, and the fields it decoded to, with names, values, enum names and nesting from
-the client's own cereal reflection. A field holding NBT opens as a tag tree. On a failure, the error the client
-raised, the fields it managed before it stopped, and the Bedrock call stack under it, down to file and line.
+## Features
+
+The overlay is laid out like Wireshark, with three panes:
+
+- **Packet list.** Every packet of the session with its direction, id, length and name. Failed decodes are coloured,
+  and the list follows the newest packet until you scroll up.
+- **Details.** The packet's decoded fields, with the names and enum values the client itself uses. NBT opens as a tag
+  tree. For a failed decode you also get the client's error, the fields it read before it stopped, and the call stack
+  down to file and line.
+- **Bytes.** The packet body in hex, with the part the client never read tinted. Search it with `Ctrl+F` and `F3`, and
+  copy a selection as a hex dump, a hex stream, text, a C array or base64.
 
 ![A StartGamePacket expanded in the details pane](docs/details.png)
 
-*Every field of a `StartGamePacket`, named, typed and nested by the client's own cereal reflection.*
+`Filter` on the toolbar lists every packet id the client knows, with a tick box and a count for each. Untick an id to
+hide it, or show only failed decodes or one direction. Right-click a packet in the list to hide it or show only it.
 
-**Bytes** — the body as one hex run, with the part the decode never reached tinted. Select a range by click, drag
-and shift-click in either half, search it for hex or text with `Ctrl+F` and `F3`, and copy as a hex dump, a hex
-stream, printable text, a C array or base64. `Show text...` puts the same output in a box instead of on the
-clipboard.
+`Start`, `Stop` and `Restart` control the capture. A capture has no length limit, and Spyglass deletes it when the
+client closes. `Capture` ▸ `Options` sets how much memory it uses and can turn off capturing sent packets. The status
+bar shows the packet count, the share that failed, the size of the capture and any dropped packets.
 
-**Filter**, on the toolbar — every packet the client knows, by id, each with a tick box and a seen count. A find box
-that `All`, `None` and `Invert` act through, `Failed decodes only`, and a box per direction. Right-clicking a packet
-in the list hides it or shows only it. The button carries a mark while a filter is on.
+The menus hold everything else:
 
-**Capture** — `Start`, `Stop` and `Restart`. Sent packets as well as received ones, no length limit, and temporary:
-it goes when the client does, and one left behind by a crashed client is cleaned up on the next inject. `Capture ▸
-Options` sets the memory it may use and turns off capturing sent packets. The status bar carries the totals, the
-share that failed, the extent of the selection, how many packets are shown, the size of the capture, and how many
-packets were dropped rather than allowed to hold the game up.
-
-**Menus**, with nothing bound to a key:
-
-- `Go` — a packet by number, the first or last, the next failed decode, the next of the same kind, and back and
-  forward through the ones you have looked at.
-- `Edit` — find by name, by id, or by hex or text in the body; mark packets; set the zero of the clock; copy the
-  row, the details tree, or every displayed row as text or CSV.
-- `View` — hide panes, zoom, expand the tree, turn the colouring off, fit the columns, open a packet in its own
-  window, and set what `Time` means: since the first packet, the previous captured one, the previous displayed one,
-  or the time of day.
-- `Analyze` — failed decodes grouped by the reason the client gave and the packet it was reading, click to jump; and
-  the selected bytes read out as an integer, a float, a varint and text.
-- `Statistics` — what the session captured, a per-id breakdown with its share of the bytes, the distribution of
-  packet lengths, and a graph of packets or bytes per second.
-- `File` — `Export Packets...` as text, CSV or JSON: all of them, the selected one, the marked ones or a range,
-  against everything captured or only what the filter shows, with the summary line, the details tree and the bytes
-  in any combination. It counts and estimates the size first, then runs behind a progress bar you can cancel,
-  without stopping the game. `Export Selected Packet Bytes...` writes the selected range raw, the whole body when
-  nothing is selected. `Export Session Summary...` writes the totals.
-
-The save dialog starts in `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on the Linux launcher, lists the
-directory it is in, takes a path typed in full, and says so before it overwrites a file.
+- `Go` jumps to a packet by number, to the next failed decode or to the next packet of the same kind, and back and
+  forward through the packets you viewed.
+- `Edit` finds packets by name, id, or hex or text in the body. It also marks packets, sets the zero of the `Time`
+  column, and copies rows or the details tree as text or CSV.
+- `View` hides panes, zooms, opens a packet in its own window, and sets what the `Time` column shows.
+- `Analyze` groups failed decodes by error and packet, and reads the selected bytes as an integer, a float, a varint
+  and text.
+- `Statistics` shows a breakdown per packet id, the distribution of packet lengths and a graph of packets or bytes per
+  second.
+- `File` exports packets as text, CSV or JSON, the selected bytes as a raw file, or a session summary. The save dialog
+  starts in `%LOCALAPPDATA%\spyglass`, or `~/.local/share/spyglass` on Linux.
 
 ## Quick Start
 
 ### Windows
 
-Unpack `spyglass-vX.Y.Z-windows-x64.zip` from the
-[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below. Start Minecraft, then run
-the injector beside the DLL:
+1. Download `spyglass-vX.Y.Z-windows-x64.zip` from the [releases](https://github.com/EndstoneMC/spyglass/releases) and
+   unpack it.
+2. Start Minecraft.
+3. Run `spyglass.exe` from the unpacked folder. It asks for administrator rights and continues in a new window.
+4. Press **F12** in game to open the overlay.
 
-```shell
-spyglass.exe
-```
+The zip holds one DLL per client version, and `spyglass.exe` loads the one that matches the running client.
 
-It asks for administrator rights, and the elevated run carries on in a window of its own.
-
-The zip holds one DLL per client build. The injector reads the running client's version and whether it is the
-preview one, and loads the newest payload beside it that does not sit above that version, so
-`spyglass-0.3.4-1.26.50.dll` also serves a 1.26.51 release client while `spyglass-0.3.4-1.26.70.preview.dll` serves
-a 1.26.70 preview. A payload you built for some other version is picked up the same way if you drop it in beside the
-others.
-
-| option | |
+| Option | Description |
 | --- | --- |
-| `--dll <path>` | a payload of your choosing, instead of the one the version match would pick |
-| `--process <name>` | a client process other than `Minecraft.Windows.exe` |
+| `--dll <path>` | Load this DLL instead of the one that matches the client. |
+| `--process <name>` | Inject into a process other than `Minecraft.Windows.exe`. |
 
-Press **F12** in game for the overlay. It takes the mouse only while the game has let go of the cursor and the
-pointer is over the overlay, so mouse-look keeps working underneath an overlay left open during play.
+The overlay takes the mouse only while the cursor is visible and over the overlay, so you can leave it open while you
+play.
 
 ### Linux
 
-There the game runs under the
-[Minecraft Bedrock Launcher](https://github.com/minecraft-linux/mcpelauncher-manifest), which loads shared objects
-as mods, so there is no injector and nothing to elevate. Unpack `spyglass-vX.Y.Z-linux-x64.zip` from the
-[releases](https://github.com/EndstoneMC/spyglass/releases), or build it yourself below. It holds one mod folder per
-client build, each with the shared object and its `mod.json`. Copy the one named for the client your launcher runs to
-where the launcher looks:
+On Linux, Spyglass is a mod for the [Minecraft Bedrock Launcher](https://github.com/minecraft-linux/mcpelauncher-manifest).
 
-```shell
-mkdir -p ~/.local/share/mcpelauncher/mods/spyglass/0.3.4
-cp -r spyglass-0.3.4-1.26.40 ~/.local/share/mcpelauncher/mods/spyglass/0.3.4/x86_64
-```
+1. Download `spyglass-vX.Y.Z-linux-x64.zip` from the [releases](https://github.com/EndstoneMC/spyglass/releases) and
+   unpack it. It holds one mod folder per client version.
+2. Copy the folder for the client your launcher runs into the launcher's mods directory:
 
-Then add that directory under `Mods` in the profile you play, and start the game.
+   ```shell
+   mkdir -p ~/.local/share/mcpelauncher/mods/spyglass/0.3.4
+   cp -r spyglass-0.3.4-1.26.40 ~/.local/share/mcpelauncher/mods/spyglass/0.3.4/x86_64
+   ```
 
-The overlay key is **F12**, the same as on Windows.
+3. Add that directory under `Mods` in the profile you play, and start the game.
+4. Press **F12** in game to open the overlay.
 
-## Building from Source
+## Supported Clients
 
-Both platforms build through `CMakePresets.json`. Dependencies are fetched during configure, so there is nothing to
-install first.
-
-### Windows
-
-Needs clang-cl and lld-link (LLVM 18+, the "C++ Clang tools for Windows" component of Visual Studio), the MSVC
-toolchain for the Windows SDK and STL, CMake 3.28+ and Ninja. Run it from a Developer prompt.
-
-```shell
-cmake --preset relwithdebinfo-windows
-cmake --build --preset relwithdebinfo-windows
-```
-
-`spyglass.exe` and one DLL per client build land in `build/relwithdebinfo-windows`.
-
-### Linux launcher mod
-
-The launcher mod is an Android x86_64 shared object. Needs the Android NDK with `ANDROID_NDK_ROOT` set, CMake 3.28+
-and Ninja. The Android presets hide themselves when that variable is unset, and the Windows presets hide themselves
-off a Windows host.
-
-```shell
-cmake --preset relwithdebinfo-android
-cmake --build --preset relwithdebinfo-android
-```
-
-One shared object per client build lands in `build/relwithdebinfo-android`.
-
-`release-windows`, `release-android` and `debug-android` configure the same way. CI builds the `relwithdebinfo`
-preset for each platform and uploads what `cmake --install` stages.
-
-### Targeting another client
-
-`MINECRAFT_CLIENTS` is the list of client builds a configure produces a payload for, one target each. The default is
-what CI ships. A release client is named by its three-part version, a preview client by all four: the build number
-is what a preview's patterns are cut against, and a release carries its whole update line whatever its build number
-is, so the part count is what says which channel an entry means.
-
-```shell
-cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.40;1.26.60.21"
-```
-
-A version no pattern set covers fails the build rather than producing a payload that would not work.
-
-## Client Versions
-
-| payload | client builds |
+| File | Client |
 | --- | --- |
 | `spyglass-0.3.4-1.26.50.dll` | Windows release 1.26.50.5, 1.26.51.1 |
 | `spyglass-0.3.4-1.26.60.dll` | Windows release 1.26.60.5 |
 | `spyglass-0.3.4-1.26.70.preview.dll` | Windows preview 1.26.70.21 |
 | `libspyglass-0.3.4-1.26.40.so` | Android x86_64 1.26.4x, for the Linux launcher |
 
-A payload is built for one client line, release or preview, and no payload is interchangeable with another. On
-Windows the injector picks the matching one; on Linux you name it yourself. A payload loaded into a client it was
-not built for installs nothing and says so in the errors window, which is also where the reason is if the packet
-count stays at zero while you are connected.
+A payload loaded into a client it was not built for installs nothing. If the packet count stays at zero while you are
+connected, open the errors window under `Help` to see why. A client update can break a payload until a new release
+supports it.
 
-A payload is not tied to a single build, and in practice covers the builds of a line, but a client update can still
-need it refreshed.
+## Building from Source
 
-## Caveats
+Both platforms build with CMake presets, and the configure step fetches every dependency.
 
-- Reports are only as good as the reasons the client gives, which vary by packet.
-- On Windows the overlay draws over Direct3D 11 and 12, and no other rendering path is supported. On Linux it is
-  drawn by the launcher's own ImGui, and is left out when the two ImGui revisions disagree.
-- A stripped launcher gets no overlay.
-- A client update that adds a source file renders its call stack frames as `<hash>:line` until a line for it is
-  added to the filename table.
-- The capture contains packet contents from whatever server you are connected to, including whatever you logged in
-  with. Nothing is sanitised, and an export writes it to disk in the clear, so read a file before you share it.
+### Windows
+
+You need clang-cl and lld-link from LLVM 18 or newer (the "C++ Clang tools for Windows" component of Visual Studio),
+the MSVC build tools for the Windows SDK and STL, CMake 3.28 or newer, and Ninja. Run these from a Developer prompt:
+
+```shell
+cmake --preset relwithdebinfo-windows
+cmake --build --preset relwithdebinfo-windows
+```
+
+`spyglass.exe` and the DLLs land in `build/relwithdebinfo-windows`. `spyglass.exe` also picks up a DLL you build for
+another client if you put it in the same folder.
+
+### Linux launcher mod
+
+The mod is an Android x86_64 shared object. You need the Android NDK with `ANDROID_NDK_ROOT` set, CMake 3.28 or newer,
+and Ninja:
+
+```shell
+cmake --preset relwithdebinfo-android
+cmake --build --preset relwithdebinfo-android
+```
+
+The mod folders land in `build/relwithdebinfo-android`. The `release-windows`, `release-android` and `debug-android`
+presets work the same way.
+
+### Other clients
+
+A build produces the payloads a release ships. To build for other clients, set `MINECRAFT_CLIENTS`. Write a release
+client as three version parts and a preview client as four:
+
+```shell
+cmake --preset relwithdebinfo-windows -D MINECRAFT_CLIENTS="1.26.60;1.26.70.21"
+```
+
+The build fails for a client version Spyglass has no patterns for.
+
+## Limitations
+
+- On Windows the overlay draws over Direct3D 11 and 12 only.
+- On Linux the overlay uses the launcher's own ImGui. It does not appear on a stripped launcher, or on one built
+  against a different ImGui revision.
+- The error for a failed decode is whatever the client reports, and some packets report little.
+- Call stack frames from a source file added in a client update show as `<hash>:line` until Spyglass adds the file.
+- A capture holds everything you and the server sent, including your login. An export writes it to disk unchanged, so
+  check a file before you share it.
 
 ## License
 
