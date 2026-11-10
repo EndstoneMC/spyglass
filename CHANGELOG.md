@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Apply as Filter and Prepare as Filter to the Analyze menu and to the right-click menus of the packet list, the details tree, Statistics ▸ Packet Types and the expert information window.
 - Added completion of packet and field names and a list of recent filters to the filter bar.
 - Added `Ctrl+/` to jump to the filter bar.
-- Selecting a field in the details pane now highlights its bytes, and clicking a byte selects the field it belongs to.
+- Added highlighting of a selected field's bytes in the bytes pane, and selecting the field of a clicked byte.
 
 ### Changed
 
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Removed the filter window's tick boxes for packets, failed decodes and direction, which the filter bar replaces.
+- Removed the Filter button from the toolbar.
 
 ### Fixed
 
