@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
 ### Added
 
 - Added a display filter bar under the toolbar that takes Wireshark's syntax, such as `!MovePlayer && frame.len > 1000`.
@@ -166,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `spyglass.log` and `events.jsonl` under `%LOCALAPPDATA%\spyglass`, with one entry per diagnostic.
 - Added an injector that asks for elevation and loads the payload into the client.
 
-[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/EndstoneMC/spyglass/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/EndstoneMC/spyglass/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/EndstoneMC/spyglass/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/EndstoneMC/spyglass/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/EndstoneMC/spyglass/compare/v0.3.1...v0.3.2
