@@ -35,7 +35,7 @@ The overlay is laid out like Wireshark, with three panes:
 - **Bytes.** The packet body in hex, with the part the client never read tinted. Search it with `Ctrl+F` and `F3`, and
   copy a selection as a hex dump, a hex stream, text, a C array or base64.
 
-![A StartGamePacket expanded in the details pane](docs/details.png)
+![A StartGamePacket field selected in the details pane, with its bytes highlighted](docs/details.png)
 
 Filtering works the way it does in Wireshark. Type a display filter in the bar under the toolbar, or press `Ctrl+/` to
 jump there, and press Enter. The bar turns green when the filter is valid and red when it is not, and suggests packet
